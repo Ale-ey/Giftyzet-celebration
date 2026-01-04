@@ -1,0 +1,285 @@
+"use client"
+
+import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
+import { X, Trash2, Plus, Minus, ShoppingCart, Gift, ArrowRight } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import type { Product } from "@/types"
+
+interface CartItem extends Product {
+  quantity: number
+}
+
+interface CartDrawerProps {
+  isOpen: boolean
+  onClose: () => void
+}
+
+export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
+  const router = useRouter()
+  const [cartItems, setCartItems] = useState<CartItem[]>([])
+
+  useEffect(() => {
+    // Load cart from localStorage
+    const savedCart = localStorage.getItem("cart")
+    if (savedCart) {
+      setCartItems(JSON.parse(savedCart))
+    }
+  }, [isOpen])
+
+  // Listen for cart updates
+  useEffect(() => {
+    const handleCartUpdate = () => {
+      const savedCart = localStorage.getItem("cart")
+      if (savedCart) {
+        setCartItems(JSON.parse(savedCart))
+      } else {
+        setCartItems([])
+      }
+    }
+
+    window.addEventListener("cartUpdated", handleCartUpdate)
+    window.addEventListener("storage", handleCartUpdate)
+
+    return () => {
+      window.removeEventListener("cartUpdated", handleCartUpdate)
+      window.removeEventListener("storage", handleCartUpdate)
+    }
+  }, [])
+
+  const updateCart = (updatedCart: CartItem[]) => {
+    setCartItems(updatedCart)
+    localStorage.setItem("cart", JSON.stringify(updatedCart))
+    window.dispatchEvent(new Event("cartUpdated"))
+  }
+
+  const removeFromCart = (productId: number) => {
+    const updatedCart = cartItems.filter((item) => item.id !== productId)
+    updateCart(updatedCart)
+  }
+
+  const updateQuantity = (productId: number, newQuantity: number) => {
+    if (newQuantity < 1) {
+      removeFromCart(productId)
+      return
+    }
+    const updatedCart = cartItems.map((item) =>
+      item.id === productId ? { ...item, quantity: newQuantity } : item
+    )
+    updateCart(updatedCart)
+  }
+
+  const calculateSubtotal = () => {
+    return cartItems.reduce((total, item) => {
+      const price = parseFloat(item.price.replace("$", ""))
+      return total + price * item.quantity
+    }, 0)
+  }
+
+  const calculateTotal = () => {
+    const subtotal = calculateSubtotal()
+    const shipping = subtotal > 0 ? 9.99 : 0
+    const tax = subtotal * 0.08 // 8% tax
+    return subtotal + shipping + tax
+  }
+
+  const handleCheckout = () => {
+    onClose()
+    router.push("/checkout")
+  }
+
+  const handleViewCart = () => {
+    onClose()
+    router.push("/cart")
+  }
+
+  return (
+    <>
+      {/* Backdrop */}
+      {isOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40 transition-opacity"
+          onClick={onClose}
+        />
+      )}
+
+      {/* Drawer */}
+      <div
+        className={`fixed top-0 right-0 h-full w-full max-w-md bg-white shadow-2xl z-50 transform transition-transform duration-300 ease-in-out ${
+          isOpen ? "translate-x-0" : "translate-x-full"
+        }`}
+      >
+        <div className="flex flex-col h-full">
+          {/* Header */}
+          <div className="flex items-center justify-between p-6 border-b border-gray-200">
+            <div className="flex items-center space-x-2">
+              <ShoppingCart className="h-5 w-5 text-primary" />
+              <h2 className="text-xl font-bold text-gray-900">
+                Shopping Cart ({cartItems.reduce((sum, item) => sum + item.quantity, 0)})
+              </h2>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-900"
+            >
+              <X className="h-5 w-5" />
+            </Button>
+          </div>
+
+          {/* Cart Items */}
+          <div className="flex-1 overflow-y-auto p-6">
+            {cartItems.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full text-center">
+                <ShoppingCart className="h-16 w-16 text-gray-300 mb-4" />
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Your cart is empty</h3>
+                <p className="text-gray-600 mb-6">
+                  Start adding items to your cart to see them here
+                </p>
+                <Button
+                  onClick={onClose}
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground"
+                >
+                  Continue Shopping
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {cartItems.map((item) => (
+                  <div
+                    key={item.id}
+                    className="flex gap-4 p-4 border-2 border-gray-100 rounded-lg hover:border-primary/20 transition-colors"
+                  >
+                    {/* Product Image */}
+                    <div className="relative w-20 h-20 rounded-lg overflow-hidden border border-gray-200 flex-shrink-0">
+                      <img
+                        src={item.image}
+                        alt={item.name}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+
+                    {/* Product Details */}
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-sm font-bold text-gray-900 mb-1 line-clamp-2">
+                        {item.name}
+                      </h3>
+                      <p className="text-xs text-gray-600 mb-2">by {item.vendor}</p>
+                      
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center space-x-2">
+                          <span className="text-sm font-bold text-primary">{item.price}</span>
+                          <span className="text-xs text-gray-500 line-through">
+                            {item.originalPrice}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Quantity Controls */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                            className="h-7 w-7 p-0 border-gray-300"
+                          >
+                            <Minus className="h-3 w-3" />
+                          </Button>
+                          <span className="text-sm font-semibold text-gray-900 w-6 text-center">
+                            {item.quantity}
+                          </span>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                            className="h-7 w-7 p-0 border-gray-300"
+                          >
+                            <Plus className="h-3 w-3" />
+                          </Button>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeFromCart(item.id)}
+                          className="h-7 w-7 p-0 text-gray-400 hover:text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Footer with Summary */}
+          {cartItems.length > 0 && (
+            <div className="border-t border-gray-200 p-6 space-y-4 bg-gray-50">
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm text-gray-600">
+                  <span>Subtotal</span>
+                  <span className="font-semibold text-gray-900">
+                    ${calculateSubtotal().toFixed(2)}
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm text-gray-600">
+                  <span>Shipping</span>
+                  <span className="font-semibold text-gray-900">
+                    {calculateSubtotal() > 0 ? "$9.99" : "Free"}
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm text-gray-600">
+                  <span>Tax</span>
+                  <span className="font-semibold text-gray-900">
+                    ${(calculateSubtotal() * 0.08).toFixed(2)}
+                  </span>
+                </div>
+                <div className="border-t border-gray-200 pt-2">
+                  <div className="flex justify-between">
+                    <span className="font-bold text-gray-900">Total</span>
+                    <span className="text-lg font-bold text-primary">
+                      ${calculateTotal().toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Button
+                  className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
+                  onClick={handleCheckout}
+                >
+                  Proceed to Checkout
+                  <ArrowRight className="h-4 w-4 ml-2" />
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full border-2 border-primary text-primary hover:bg-primary/10"
+                  onClick={() => {
+                    router.push(`/send-gift?items=${encodeURIComponent(JSON.stringify(cartItems))}`)
+                    onClose()
+                  }}
+                >
+                  <Gift className="h-4 w-4 mr-2" />
+                  Gift All Items
+                </Button>
+                <Button
+                  variant="ghost"
+                  className="w-full text-gray-600 hover:text-gray-900"
+                  onClick={handleViewCart}
+                >
+                  View Full Cart
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </>
+  )
+}
+

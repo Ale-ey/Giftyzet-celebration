@@ -1,0 +1,175 @@
+@import "tailwindcss";
+
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+All colors MUST be HSL.
+*/
+
+@theme {
+  /* Register colors for Tailwind utilities - LIGHT MODE (default) */
+  --color-background: hsl(0 0% 100%);
+  --color-foreground: hsl(0 0% 0%);
+  --color-card: hsl(0 0% 100%);
+  --color-card-foreground: hsl(0 0% 0%);
+  --color-popover: hsl(0 0% 100%);
+  --color-popover-foreground: hsl(0 0% 0%);
+  --color-primary: hsl(0 84% 50%);
+  --color-primary-foreground: hsl(0 0% 100%);
+  --color-primary-glow: hsl(0 85% 55%);
+  --color-secondary: hsl(45 90% 60%);
+  --color-secondary-foreground: hsl(0 0% 0%);
+  --color-accent: hsl(280 65% 65%);
+  --color-accent-foreground: hsl(0 0% 100%);
+  --color-muted: hsl(0 0% 96%);
+  --color-muted-foreground: hsl(0 0% 50%);
+  --color-destructive: hsl(0 84.2% 60.2%);
+  --color-destructive-foreground: hsl(0 0% 100%);
+  --color-border: hsl(0 0% 90%);
+  --color-input: hsl(0 0% 95%);
+  --color-ring: hsl(0 84% 50%);
+  --radius: 12px;
+}
+
+@layer base {
+  :root {
+    /* GiftyZel Color Palette - LIGHT MODE */
+    --background: 0 0% 100%;
+    --foreground: 0 0% 0%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 0%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 0%;
+
+    /* Primary: Red (for logo, buttons) */
+    --primary: 0 84% 50%;
+    --primary-foreground: 0 0% 100%;
+    --primary-glow: 0 85% 55%;
+
+    /* Secondary: Gold/Orange */
+    --secondary: 30 100% 60%;
+    --secondary-foreground: 0 0% 0%;
+
+    /* Accent: Purple */
+    --accent: 280 65% 65%;
+    --accent-foreground: 0 0% 100%;
+
+    --muted: 0 0% 96%;
+    --muted-foreground: 0 0% 50%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 0 0% 90%;
+    --input: 0 0% 95%;
+    --ring: 0 84% 50%;
+
+    --radius: 12px;
+
+    /* Hero Gradient: Pink → Purple → Orange */
+    --gradient-hero: linear-gradient(135deg, 
+      hsl(350 85% 65%) 0%, 
+      hsl(320 70% 65%) 25%,
+      hsl(280 65% 65%) 50%, 
+      hsl(300 75% 70%) 75%,
+      hsl(30 100% 65%) 100%
+    );
+
+    /* Celebration Gradients */
+    --gradient-celebration: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--accent)));
+    --gradient-gift: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-glow)));
+
+    /* Celebration Shadows */
+    --shadow-celebration: 0 10px 40px -10px hsl(var(--primary) / 0.3);
+    --shadow-gift: 0 8px 25px -8px hsl(var(--primary) / 0.4);
+    --shadow-glow: 0 0 50px hsl(var(--primary-glow) / 0.5);
+
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 0 0% 20%;
+    --sidebar-primary: 0 84% 50%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 0 0% 96%;
+    --sidebar-accent-foreground: 0 0% 20%;
+    --sidebar-border: 0 0% 90%;
+    --sidebar-ring: 0 84% 50%;
+  }
+
+  /* Dark mode - only applies when html has .dark class */
+  html.dark {
+    /* Dark Mode Theme */
+    --background: 0 0% 8%;
+    --foreground: 0 0% 95%;
+
+    --card: 0 0% 12%;
+    --card-foreground: 0 0% 95%;
+
+    --popover: 0 0% 12%;
+    --popover-foreground: 0 0% 95%;
+
+    --primary: 0 80% 55%;
+    --primary-foreground: 0 0% 100%;
+    --primary-glow: 0 75% 60%;
+
+    --secondary: 30 85% 65%;
+    --secondary-foreground: 0 0% 8%;
+
+    --accent: 280 60% 70%;
+    --accent-foreground: 0 0% 8%;
+
+    --muted: 0 0% 20%;
+    --muted-foreground: 0 0% 70%;
+
+    --destructive: 0 75% 65%;
+    --destructive-foreground: 0 0% 8%;
+
+    --border: 0 0% 25%;
+    --input: 0 0% 20%;
+    --ring: 0 80% 55%;
+    
+    --sidebar-background: 0 0% 10%;
+    --sidebar-foreground: 0 0% 95%;
+    --sidebar-primary: 0 80% 55%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 0 0% 16%;
+    --sidebar-accent-foreground: 0 0% 95%;
+    --sidebar-border: 0 0% 16%;
+    --sidebar-ring: 0 80% 55%;
+  }
+
+  html.dark {
+    @theme {
+      /* Dark mode theme colors for Tailwind utilities */
+      --color-background: hsl(0 0% 8%);
+      --color-foreground: hsl(0 0% 95%);
+      --color-card: hsl(0 0% 12%);
+      --color-card-foreground: hsl(0 0% 95%);
+      --color-popover: hsl(0 0% 12%);
+      --color-popover-foreground: hsl(0 0% 95%);
+      --color-primary: hsl(0 80% 55%);
+      --color-primary-foreground: hsl(0 0% 100%);
+      --color-primary-glow: hsl(0 75% 60%);
+      --color-secondary: hsl(30 85% 65%);
+      --color-secondary-foreground: hsl(0 0% 8%);
+      --color-accent: hsl(280 60% 70%);
+      --color-accent-foreground: hsl(0 0% 8%);
+      --color-muted: hsl(0 0% 20%);
+      --color-muted-foreground: hsl(0 0% 70%);
+      --color-destructive: hsl(0 75% 65%);
+      --color-destructive-foreground: hsl(0 0% 8%);
+      --color-border: hsl(0 0% 25%);
+      --color-input: hsl(0 0% 20%);
+      --color-ring: hsl(0 80% 55%);
+    }
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  }
+}

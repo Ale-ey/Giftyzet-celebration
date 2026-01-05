@@ -15,8 +15,57 @@ export default function MarketplacePreview() {
     router.push(`/product/${product.id}`)
   }
 
+  const handleBuyNow = (e: React.MouseEvent, product: Product) => {
+    e.stopPropagation() // Prevent card click
+    
+    // Add product to cart
+    const cartItem = {
+      ...product,
+      quantity: 1
+    }
+    const existingCart = JSON.parse(localStorage.getItem("cart") || "[]")
+    
+    // Check if product already exists in cart
+    const existingItemIndex = existingCart.findIndex((item: Product & { quantity: number }) => item.id === product.id)
+    
+    if (existingItemIndex >= 0) {
+      // Update quantity if already in cart
+      existingCart[existingItemIndex].quantity += 1
+    } else {
+      // Add new item to cart
+      existingCart.push(cartItem)
+    }
+    
+    localStorage.setItem("cart", JSON.stringify(existingCart))
+    
+    // Dispatch event to update cart count in header
+    window.dispatchEvent(new Event("cartUpdated"))
+    
+    // Navigate to product detail page
+    router.push(`/product/${product.id}`)
+  }
+
   const handleGiftNow = (e: React.MouseEvent, product: Product) => {
     e.stopPropagation() // Prevent card click
+    
+    // Add product to cart first
+    const cartItem = {
+      ...product,
+      quantity: 1
+    }
+    const existingCart = JSON.parse(localStorage.getItem("cart") || "[]")
+    const existingItemIndex = existingCart.findIndex((item: Product & { quantity: number }) => item.id === product.id)
+    
+    if (existingItemIndex >= 0) {
+      existingCart[existingItemIndex].quantity += 1
+    } else {
+      existingCart.push(cartItem)
+    }
+    
+    localStorage.setItem("cart", JSON.stringify(existingCart))
+    window.dispatchEvent(new Event("cartUpdated"))
+    
+    // Navigate to gift page
     router.push(`/send-gift?product=${encodeURIComponent(JSON.stringify(product))}`)
   }
 
@@ -108,10 +157,11 @@ export default function MarketplacePreview() {
                 
                 <Button 
                   size="sm" 
-                  className="w-full bg-primary hover:bg-primary/90 text-white font-semibold"
-                  onClick={(e) => handleGiftNow(e, product)}
+                  variant="outline"
+                  className="w-full border-2 border-gray-300 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-400 font-semibold"
+                  onClick={(e) => handleBuyNow(e, product)}
                 >
-                  Gift Now
+                  Buy Now
                 </Button>
               </CardContent>
             </Card>

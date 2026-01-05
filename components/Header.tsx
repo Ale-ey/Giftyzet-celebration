@@ -13,7 +13,10 @@ import {
   Heart, 
   Gift,
   ShoppingCart,
-  Bell
+  Bell,
+  Store,
+  ShoppingBag,
+  Wrench
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -24,14 +27,22 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import CartDrawer from "@/components/cart/CartDrawer"
+import AuthModal from "@/components/AuthModal"
 
 export default function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [cartCount, setCartCount] = useState(0)
   const [isCartOpen, setIsCartOpen] = useState(false)
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false)
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [userEmail, setUserEmail] = useState("")
+  const [userRole, setUserRole] = useState<"user" | "admin" | "vendor">("user")
   const router = useRouter()
 
   useEffect(() => {
+    // Only run on client side
+    if (typeof window === "undefined") return
+
     // Load cart count from localStorage
     const updateCartCount = () => {
       const savedCart = localStorage.getItem("cart")
@@ -58,19 +69,52 @@ export default function Header() {
     }
   }, [])
 
-  // Hardcoded user state - set to true to show logged in state, false for logged out
-  const isLoggedIn = true
-  const userEmail = "user@example.com"
-  const userName = userEmail.split("@")[0]
-  const canAccessVendor = true
-  // Change userRole to "admin" to see admin menu, or "vendor" for vendor menu
-  const userRole = "user" as "user" | "admin" | "vendor"
+  // Check and listen for auth updates
+  useEffect(() => {
+    // Only run on client side
+    if (typeof window === "undefined") return
+
+    const updateAuth = () => {
+      const authData = localStorage.getItem("auth")
+      if (authData) {
+        try {
+          const auth = JSON.parse(authData)
+          setIsLoggedIn(true)
+          setUserEmail(auth.email || "")
+          setUserRole(auth.role || "user")
+        } catch (e) {
+          setIsLoggedIn(false)
+        }
+      } else {
+        setIsLoggedIn(false)
+        setUserEmail("")
+        setUserRole("user")
+      }
+    }
+
+    // Initial check
+    updateAuth()
+    
+    // Listen for auth updates
+    window.addEventListener("authUpdated", updateAuth)
+    window.addEventListener("storage", updateAuth)
+    
+    return () => {
+      window.removeEventListener("authUpdated", updateAuth)
+      window.removeEventListener("storage", updateAuth)
+    }
+  }, [])
 
   const handleSignOut = () => {
-    // Hardcoded sign out - in real app, this would call an API
-    console.log("Sign out clicked")
+    // Clear auth data
+    localStorage.removeItem("auth")
+        setIsLoggedIn(false)
+        setUserEmail("")
+        setUserRole("user")
     setIsMenuOpen(false)
   }
+
+  const userName = userEmail.split("@")[0]
 
   return (
     <header className="bg-white border-b border-border sticky top-0 z-50 shadow-sm">
@@ -90,16 +134,25 @@ export default function Header() {
           <nav className="hidden lg:flex items-center space-x-4 xl:space-x-6 flex-1 justify-center">
             <Link href="/wishlist">
               <Button variant="ghost" className="text-gray-900 hover:text-primary hover:bg-primary/10 text-sm xl:text-base transition-colors">
+                <Heart className="h-4 w-4 mr-2" />
                 Wishlist
               </Button>
             </Link>
             <Link href="/marketplace">
               <Button variant="ghost" className="text-gray-900 hover:text-primary hover:bg-primary/10 text-sm xl:text-base transition-colors">
+                <ShoppingBag className="h-4 w-4 mr-2" />
                 Marketplace
+              </Button>
+            </Link>
+            <Link href="/vendors">
+              <Button variant="ghost" className="text-gray-900 hover:text-primary hover:bg-primary/10 text-sm xl:text-base transition-colors">
+                <Store className="h-4 w-4 mr-2" />
+                Top Vendors
               </Button>
             </Link>
             <Link href="/services">
               <Button variant="ghost" className="text-gray-900 hover:text-primary hover:bg-primary/10 text-sm xl:text-base transition-colors">
+                <Wrench className="h-4 w-4 mr-2" />
                 Services
               </Button>
             </Link>
@@ -157,9 +210,9 @@ export default function Header() {
                     <Settings className="h-4 w-4 mr-2" />
                     My Bookings
                   </DropdownMenuItem>
-                  {canAccessVendor && (
-                    <DropdownMenuItem onClick={() => router.push("/vendor-dashboard")}>
-                      <Settings className="h-4 w-4 mr-2" />
+                  {(userRole === "vendor" || userRole === "admin") && (
+                    <DropdownMenuItem onClick={() => router.push("/vendor")}>
+                      <Store className="h-4 w-4 mr-2" />
                       Vendor Dashboard
                     </DropdownMenuItem>
                   )}
@@ -176,11 +229,14 @@ export default function Header() {
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (
-              <Link href="/auth">
-                <Button variant="ghost" size="sm" className="hidden lg:flex text-gray-900 hover:text-primary hover:bg-primary/10 transition-colors">
-                  <User className="h-4 w-4" />
-                </Button>
-              </Link>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="hidden lg:flex text-gray-900 hover:text-primary hover:bg-primary/10 transition-colors"
+                onClick={() => setIsAuthModalOpen(true)}
+              >
+                <User className="h-4 w-4" />
+              </Button>
             )}
             
             <Link href="/send-gift">
@@ -242,12 +298,19 @@ export default function Header() {
               </Link>
               <Link href="/marketplace" onClick={() => setIsMenuOpen(false)}>
                 <Button variant="ghost" className="justify-start w-full text-gray-900 hover:text-primary hover:bg-primary/10 transition-colors">
-                  <Gift className="h-4 w-4 mr-2" />
+                  <ShoppingBag className="h-4 w-4 mr-2" />
                   Marketplace
+                </Button>
+              </Link>
+              <Link href="/vendors" onClick={() => setIsMenuOpen(false)}>
+                <Button variant="ghost" className="justify-start w-full text-gray-900 hover:text-primary hover:bg-primary/10 transition-colors">
+                  <Store className="h-4 w-4 mr-2" />
+                  Top Vendors
                 </Button>
               </Link>
               <Link href="/services" onClick={() => setIsMenuOpen(false)}>
                 <Button variant="ghost" className="justify-start w-full text-gray-900 hover:text-primary hover:bg-primary/10 transition-colors">
+                  <Wrench className="h-4 w-4 mr-2" />
                   Services
                 </Button>
               </Link>
@@ -277,10 +340,10 @@ export default function Header() {
                         My Bookings
                       </Button>
                     </Link>
-                    {canAccessVendor && (
-                      <Link href="/vendor-dashboard" onClick={() => setIsMenuOpen(false)}>
+                    {(userRole === "vendor" || userRole === "admin") && (
+                      <Link href="/vendor" onClick={() => setIsMenuOpen(false)}>
                         <Button variant="ghost" size="sm" className="w-full justify-start text-gray-900 hover:text-primary hover:bg-primary/10 transition-colors">
-                          <Settings className="h-4 w-4 mr-2" />
+                          <Store className="h-4 w-4 mr-2" />
                           Vendor Dashboard
                         </Button>
                       </Link>
@@ -306,12 +369,18 @@ export default function Header() {
                     </Button>
                   </>
                 ) : (
-                  <Link href="/auth" onClick={() => setIsMenuOpen(false)}>
-                    <Button variant="ghost" size="sm" className="w-full text-gray-900 hover:text-primary hover:bg-primary/10 transition-colors">
-                      <User className="h-4 w-4 mr-2" />
-                      Sign In
-                    </Button>
-                  </Link>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="w-full text-gray-900 hover:text-primary hover:bg-primary/10 transition-colors"
+                    onClick={() => {
+                      setIsMenuOpen(false)
+                      setIsAuthModalOpen(true)
+                    }}
+                  >
+                    <User className="h-4 w-4 mr-2" />
+                    Sign In
+                  </Button>
                 )}
                 <Link href="/send-gift" onClick={() => setIsMenuOpen(false)}>
                   <Button className="bg-primary hover:bg-primary/90 text-primary-foreground w-full transition-colors">
@@ -327,6 +396,9 @@ export default function Header() {
 
         {/* Cart Drawer */}
         <CartDrawer isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} />
+        
+        {/* Auth Modal */}
+        <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} />
       </header>
     )
   }

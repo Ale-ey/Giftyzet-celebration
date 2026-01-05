@@ -1,0 +1,312 @@
+"use client"
+
+import { useState } from "react"
+import { X, Mail, Lock, User, Store } from "lucide-react"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+
+interface AuthModalProps {
+  isOpen: boolean
+  onClose: () => void
+}
+
+type AuthMode = "signin" | "signup" | "signup-vendor"
+
+export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
+  const [mode, setMode] = useState<AuthMode>("signin")
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+  const [name, setName] = useState("")
+  const [vendorName, setVendorName] = useState("")
+  const [loading, setLoading] = useState(false)
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoading(true)
+
+    // Simulate API call
+    setTimeout(() => {
+      console.log("Auth submitted:", { mode, email, password, name, vendorName })
+      
+      // Save auth data to localStorage
+      const authData = {
+        email,
+        name: mode !== "signin" ? name : undefined,
+        vendorName: mode === "signup-vendor" ? vendorName : undefined,
+        role: mode === "signup-vendor" ? "vendor" : "user",
+        isLoggedIn: true
+      }
+      localStorage.setItem("auth", JSON.stringify(authData))
+      
+      // If vendor signup, create vendor and store request
+      if (mode === "signup-vendor" && vendorName) {
+        const { saveVendor, saveStore } = require("@/lib/vendor-data")
+        const vendorId = `vendor-${Date.now()}`
+        const vendor = {
+          id: vendorId,
+          email,
+          name,
+          vendorName,
+          role: "vendor" as const,
+          createdAt: new Date().toISOString()
+        }
+        saveVendor(vendor)
+        
+        // Create store with pending status
+        const store = {
+          id: `store-${Date.now()}`,
+          vendorId,
+          name: vendorName,
+          status: "pending" as const,
+          createdAt: new Date().toISOString()
+        }
+        saveStore(store)
+      }
+      
+      // Dispatch event to update header
+      window.dispatchEvent(new Event("authUpdated"))
+      
+      setLoading(false)
+      // Close the modal
+      onClose()
+      // Reset form
+      setEmail("")
+      setPassword("")
+      setName("")
+      setVendorName("")
+      setMode("signin")
+    }, 1000)
+  }
+
+  const switchToSignIn = () => {
+    setMode("signin")
+    setEmail("")
+    setPassword("")
+    setName("")
+    setVendorName("")
+  }
+
+  const switchToSignUp = () => {
+    setMode("signup")
+    setEmail("")
+    setPassword("")
+    setName("")
+    setVendorName("")
+  }
+
+  const switchToVendorSignUp = () => {
+    setMode("signup-vendor")
+    setEmail("")
+    setPassword("")
+    setName("")
+    setVendorName("")
+  }
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-md bg-white">
+        <DialogHeader>
+          <DialogTitle className="text-2xl font-bold text-gray-900">
+            {mode === "signin" && "Sign In"}
+            {mode === "signup" && "Sign Up"}
+            {mode === "signup-vendor" && "Sign Up as Vendor"}
+          </DialogTitle>
+          <DialogDescription>
+            {mode === "signin" && "Welcome back! Sign in to your account."}
+            {mode === "signup" && "Create a new account to start gifting."}
+            {mode === "signup-vendor" && "Join as a vendor to sell your products and services."}
+          </DialogDescription>
+        </DialogHeader>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {(mode === "signup" || mode === "signup-vendor") && (
+            <div className="space-y-2">
+              <label htmlFor="name" className="text-sm font-semibold text-gray-900">
+                Full Name
+              </label>
+              <div className="relative">
+                <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                <Input
+                  id="name"
+                  type="text"
+                  placeholder="Enter your full name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="pl-10"
+                  required={mode === "signup" || mode === "signup-vendor"}
+                />
+              </div>
+            </div>
+          )}
+
+          {mode === "signup-vendor" && (
+            <div className="space-y-2">
+              <label htmlFor="vendorName" className="text-sm font-semibold text-gray-900">
+                Business/Vendor Name
+              </label>
+              <div className="relative">
+                <Store className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                <Input
+                  id="vendorName"
+                  type="text"
+                  placeholder="Enter your business name"
+                  value={vendorName}
+                  onChange={(e) => setVendorName(e.target.value)}
+                  className="pl-10"
+                  required
+                />
+              </div>
+            </div>
+          )}
+
+          <div className="space-y-2">
+            <label htmlFor="email" className="text-sm font-semibold text-gray-900">
+              Email
+            </label>
+            <div className="relative">
+              <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+              <Input
+                id="email"
+                type="email"
+                placeholder="Enter your email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="pl-10"
+                required
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label htmlFor="password" className="text-sm font-semibold text-gray-900">
+              Password
+            </label>
+            <div className="relative">
+              <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+              <Input
+                id="password"
+                type="password"
+                placeholder="Enter your password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="pl-10"
+                required
+              />
+            </div>
+          </div>
+
+          {mode === "signin" && (
+            <div className="flex items-center justify-between text-sm">
+              <label className="flex items-center space-x-2 cursor-pointer">
+                <input type="checkbox" className="rounded" />
+                <span className="text-gray-600">Remember me</span>
+              </label>
+              <button type="button" className="text-primary hover:text-primary/80 font-medium">
+                Forgot password?
+              </button>
+            </div>
+          )}
+
+          <Button
+            type="submit"
+            variant="outline"
+            className="w-full border-2 border-gray-300 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-400 font-semibold"
+            disabled={loading}
+          >
+            {loading ? "Processing..." : mode === "signin" ? "Sign In" : "Sign Up"}
+          </Button>
+        </form>
+
+        {/* Mode Switcher */}
+        <div className="mt-6 pt-6 border-t border-gray-200">
+          {mode === "signin" ? (
+            <div className="space-y-3">
+              <p className="text-sm text-center text-gray-600">
+                Don't have an account?{" "}
+                <button
+                  type="button"
+                  onClick={switchToSignUp}
+                  className="text-primary hover:text-primary/80 font-semibold"
+                >
+                  Sign Up
+                </button>
+              </p>
+              <div className="flex items-center gap-2">
+                <div className="flex-1 h-px bg-gray-200"></div>
+                <span className="text-xs text-gray-500 uppercase">or</span>
+                <div className="flex-1 h-px bg-gray-200"></div>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full border-2 border-gray-300 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-400 font-medium"
+                onClick={switchToVendorSignUp}
+              >
+                <Store className="h-4 w-4 mr-2" />
+                Sign Up as Vendor
+              </Button>
+            </div>
+          ) : mode === "signup" ? (
+            <div className="space-y-3">
+              <p className="text-sm text-center text-gray-600">
+                Already have an account?{" "}
+                <button
+                  type="button"
+                  onClick={switchToSignIn}
+                  className="text-primary hover:text-primary/80 font-semibold"
+                >
+                  Sign In
+                </button>
+              </p>
+              <div className="flex items-center gap-2">
+                <div className="flex-1 h-px bg-gray-200"></div>
+                <span className="text-xs text-gray-500 uppercase">or</span>
+                <div className="flex-1 h-px bg-gray-200"></div>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full border-2 border-gray-300 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-400 font-medium"
+                onClick={switchToVendorSignUp}
+              >
+                <Store className="h-4 w-4 mr-2" />
+                Sign Up as Vendor
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <p className="text-sm text-center text-gray-600">
+                Want to sign up as a regular user?{" "}
+                <button
+                  type="button"
+                  onClick={switchToSignUp}
+                  className="text-primary hover:text-primary/80 font-semibold"
+                >
+                  Sign Up
+                </button>
+              </p>
+              <p className="text-sm text-center text-gray-600">
+                Already have an account?{" "}
+                <button
+                  type="button"
+                  onClick={switchToSignIn}
+                  className="text-primary hover:text-primary/80 font-semibold"
+                >
+                  Sign In
+                </button>
+              </p>
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+

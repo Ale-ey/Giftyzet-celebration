@@ -86,7 +86,7 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
 
   const handleCheckout = () => {
     onClose()
-    router.push("/checkout")
+    router.push("/checkout?type=self")
   }
 
   const handleViewCart = () => {

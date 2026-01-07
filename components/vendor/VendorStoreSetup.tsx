@@ -144,7 +144,7 @@ export default function VendorStoreSetup() {
     
     setTimeout(() => {
       setSaving(false)
-      router.push("/vendor")
+      router.push("/vendor/dashboard")
     }, 500)
   }
 

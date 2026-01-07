@@ -2,10 +2,20 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { ArrowLeft, User, Mail, Lock, MapPin, Phone, Camera, Save } from "lucide-react"
+import { ArrowLeft, User, Mail, Lock, MapPin, Phone, Camera, Save, LogOut } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { useToast } from "@/components/ui/toast"
+import ChangePasswordModal from "./ChangePasswordModal"
+import LogoutConfirmationModal from "./LogoutConfirmationModal"
+import { 
+  getCurrentUserWithProfile, 
+  signOut, 
+  updateCurrentProfile, 
+  uploadAvatarAndUpdateProfile,
+  getCurrentProfile
+} from "@/lib/api/auth"
 
 interface UserProfile {
   email: string
@@ -30,68 +40,139 @@ export default function ProfilePage() {
     password: "",
     role: "user"
   })
-  const [currentPassword, setCurrentPassword] = useState("")
-  const [newPassword, setNewPassword] = useState("")
-  const [confirmPassword, setConfirmPassword] = useState("")
   const [avatarPreview, setAvatarPreview] = useState<string>("")
+  const [signingOut, setSigningOut] = useState(false)
+  const [isChangePasswordModalOpen, setIsChangePasswordModalOpen] = useState(false)
+  const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false)
+  const { showToast } = useToast()
 
   useEffect(() => {
-    // Load user profile from localStorage
-    if (typeof window === "undefined") return
+    // Load user profile from Supabase
+    const loadProfile = async () => {
+      setLoading(true)
+      try {
+        // Wait a bit for auth session to be established after login
+        await new Promise(resolve => setTimeout(resolve, 500))
+        
+        const userProfile = await getCurrentProfile()
+        
+        if (userProfile) {
+          // Profile exists - load it with pre-filled data
+          setProfile({
+            email: userProfile.email || "",
+            name: userProfile.name || userProfile.email?.split("@")[0] || "",
+            avatar: userProfile.avatar_url || "",
+            phoneNumber: userProfile.phone_number || "",
+            address: userProfile.address || "",
+            role: (userProfile.role as "user" | "admin" | "vendor") || "user"
+          })
+          setAvatarPreview(userProfile.avatar_url || "")
+        } else {
+          // Profile doesn't exist - check if user is authenticated
+          const { getCurrentUser } = await import("@/lib/api/auth")
+          const user = await getCurrentUser()
+          
+          if (user) {
+            // User is authenticated but profile doesn't exist - show form with email/name pre-filled
+            // Profile will be created when user saves
+            setProfile({
+              email: user.email || "",
+              name: user.user_metadata?.name || user.email?.split("@")[0] || "",
+              avatar: "",
+              phoneNumber: "",
+              address: "",
+              role: "user"
+            })
+            setAvatarPreview("")
+          } else {
+            // Not authenticated - redirect to home
+            router.push("/")
+            return
+          }
+        }
+      } catch (e: any) {
+        console.error("Error loading profile:", e)
+        // Check if it's an auth error
+        if (e?.message?.includes("JWT") || e?.message?.includes("authentication") || e?.code === "PGRST301") {
+          // Auth error - redirect to home
+          router.push("/")
+          return
+        }
+        
+        // For other errors (like RLS), try to get user from auth and show form
+        try {
+          const { getCurrentUser } = await import("@/lib/api/auth")
+          const user = await getCurrentUser()
+          if (user) {
+            // Show form with email pre-filled even if profile load failed
+            setProfile({
+              email: user.email || "",
+              name: user.user_metadata?.name || user.email?.split("@")[0] || "",
+              avatar: "",
+              phoneNumber: "",
+              address: "",
+              role: "user"
+            })
+          } else {
+            router.push("/")
+          }
+        } catch (authError) {
+          router.push("/")
+        }
+      } finally {
+        setLoading(false)
+      }
+    }
 
-    const authData = localStorage.getItem("auth")
-    if (!authData) {
-      // Redirect to home if not logged in
-      router.push("/")
+    loadProfile()
+  }, [router])
+
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    // Validate file type
+    if (!file.type.startsWith("image/")) {
+      alert("Please select an image file")
       return
     }
 
-    try {
-      const auth = JSON.parse(authData)
-      
-      // Load extended profile data
-      const profileData = localStorage.getItem(`profile_${auth.email}`)
-      const savedProfile = profileData ? JSON.parse(profileData) : {}
-
-      setProfile({
-        email: auth.email || "",
-        name: auth.name || auth.email?.split("@")[0] || "",
-        avatar: savedProfile.avatar || "",
-        phoneNumber: savedProfile.phoneNumber || "",
-        address: savedProfile.address || "",
-        password: savedProfile.password || "",
-        role: auth.role || "user"
-      })
-
-      setAvatarPreview(savedProfile.avatar || "")
-    } catch (e) {
-      console.error("Error loading profile:", e)
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      alert("Image size should be less than 5MB")
+      return
     }
-  }, [router])
 
-  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) {
-      // Validate file type
-      if (!file.type.startsWith("image/")) {
-        alert("Please select an image file")
-        return
-      }
+    // Create preview immediately
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      const result = reader.result as string
+      setAvatarPreview(result)
+      setProfile(prev => ({ ...prev, avatar: result }))
+    }
+    reader.readAsDataURL(file)
 
-      // Validate file size (max 5MB)
-      if (file.size > 5 * 1024 * 1024) {
-        alert("Image size should be less than 5MB")
-        return
+    // Upload to Supabase Storage and update profile
+    try {
+      setSaving(true)
+      const updatedProfile = await uploadAvatarAndUpdateProfile(file)
+      setProfile(prev => ({
+        ...prev,
+        avatar: updatedProfile.avatar_url || ""
+      }))
+      setAvatarPreview(updatedProfile.avatar_url || "")
+      window.dispatchEvent(new Event("authUpdated"))
+      showToast("Avatar updated successfully!", "success")
+    } catch (error: any) {
+      console.error("Error uploading avatar:", error)
+      showToast(`Failed to upload avatar: ${error.message || "Please try again."}`, "error")
+      // Revert preview on error
+      const currentProfile = await getCurrentProfile()
+      if (currentProfile) {
+        setAvatarPreview(currentProfile.avatar_url || "")
       }
-
-      // Create preview
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        const result = reader.result as string
-        setAvatarPreview(result)
-        setProfile(prev => ({ ...prev, avatar: result }))
-      }
-      reader.readAsDataURL(file)
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -100,70 +181,78 @@ export default function ProfilePage() {
     setSaving(true)
 
     try {
-      // Validate password change if provided
-      if (currentPassword || newPassword || confirmPassword) {
-        if (!currentPassword) {
-          alert("Please enter your current password")
-          setSaving(false)
-          return
-        }
-
-        if (!newPassword) {
-          alert("Please enter a new password")
-          setSaving(false)
-          return
-        }
-
-        if (newPassword !== confirmPassword) {
-          alert("New passwords do not match")
-          setSaving(false)
-          return
-        }
-
-        if (newPassword.length < 6) {
-          alert("Password must be at least 6 characters long")
-          setSaving(false)
-          return
-        }
-
-        // In a real app, verify current password with backend
-        // For now, we'll just update it
+      const { getCurrentUser } = await import("@/lib/api/auth")
+      const user = await getCurrentUser()
+      if (!user) {
+        router.push("/")
+        return
       }
 
-      // Update auth data in localStorage
-      const authData = localStorage.getItem("auth")
-      if (authData) {
-        const auth = JSON.parse(authData)
-        const updatedAuth = {
-          ...auth,
-          name: profile.name
-        }
-        localStorage.setItem("auth", JSON.stringify(updatedAuth))
+      // Check if profile exists
+      let currentProfile
+      try {
+        currentProfile = await getCurrentProfile()
+      } catch (e) {
+        // Profile doesn't exist - will create it
+        currentProfile = null
       }
 
-      // Save extended profile data
-      const profileData = {
-        avatar: profile.avatar,
-        phoneNumber: profile.phoneNumber,
-        address: profile.address,
-        password: newPassword || profile.password
+      if (currentProfile) {
+        // Update existing profile
+        await updateCurrentProfile({
+          name: profile.name,
+          phone_number: profile.phoneNumber || undefined,
+          address: profile.address || undefined,
+          // Don't update avatar_url here if it's a base64 string (already uploaded)
+          // Only update if it's a URL
+          ...(profile.avatar && profile.avatar.startsWith('http') 
+            ? { avatar_url: profile.avatar } 
+            : {})
+        })
+      } else {
+        // Create new profile
+        const { setProfile: createProfile } = await import("@/lib/api/profile")
+        await createProfile(user.id, {
+          name: profile.name,
+          email: profile.email || user.email || "",
+          phone_number: profile.phoneNumber || undefined,
+          address: profile.address || undefined,
+          avatar_url: profile.avatar && profile.avatar.startsWith('http') ? profile.avatar : undefined
+        })
       }
-      localStorage.setItem(`profile_${profile.email}`, JSON.stringify(profileData))
 
       // Dispatch event to update header
       window.dispatchEvent(new Event("authUpdated"))
 
-      alert("Profile updated successfully!")
-      
-      // Clear password fields
-      setCurrentPassword("")
-      setNewPassword("")
-      setConfirmPassword("")
-    } catch (error) {
+      showToast("Profile updated successfully!", "success")
+    } catch (error: any) {
       console.error("Error saving profile:", error)
-      alert("Failed to update profile. Please try again.")
+      showToast(`Failed to update profile: ${error.message || "Please try again."}`, "error")
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleSignOutClick = () => {
+    setIsLogoutModalOpen(true)
+  }
+
+  const handleSignOutConfirm = async () => {
+    try {
+      setSigningOut(true)
+      await signOut()
+      setIsLogoutModalOpen(false)
+      showToast("Signed out successfully", "success")
+      // Small delay to show toast before redirect
+      setTimeout(() => {
+        router.push("/")
+      }, 500)
+    } catch (error: any) {
+      console.error("Sign out error:", error)
+      showToast(`Failed to sign out: ${error.message || "Please try again."}`, "error")
+      setIsLogoutModalOpen(false)
+    } finally {
+      setSigningOut(false)
     }
   }
 
@@ -305,57 +394,37 @@ export default function ProfilePage() {
             <CardHeader>
               <CardTitle className="text-2xl font-semibold text-gray-900 flex items-center">
                 <Lock className="h-5 w-5 mr-2" />
-                Change Password
+                Password
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <label htmlFor="current-password" className="text-sm font-semibold text-gray-900">
-                  Current Password
-                </label>
-                <Input
-                  id="current-password"
-                  type="password"
-                  placeholder="Enter your current password"
-                  value={currentPassword}
-                  onChange={(e) => setCurrentPassword(e.target.value)}
-                  className="w-full"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label htmlFor="new-password" className="text-sm font-semibold text-gray-900">
-                  New Password
-                </label>
-                <Input
-                  id="new-password"
-                  type="password"
-                  placeholder="Enter your new password"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  className="w-full"
-                />
-                <p className="text-xs text-gray-500">Password must be at least 6 characters long</p>
-              </div>
-
-              <div className="space-y-2">
-                <label htmlFor="confirm-password" className="text-sm font-semibold text-gray-900">
-                  Confirm New Password
-                </label>
-                <Input
-                  id="confirm-password"
-                  type="password"
-                  placeholder="Confirm your new password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="w-full"
-                />
-              </div>
+            <CardContent>
+              <p className="text-sm text-gray-600 mb-4">
+                Change your password to keep your account secure.
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsChangePasswordModalOpen(true)}
+                className="border-gray-300 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-400"
+              >
+                <Lock className="h-4 w-4 mr-2" />
+                Change Password
+              </Button>
             </CardContent>
           </Card>
 
-          {/* Submit Button */}
-          <div className="mt-6 flex justify-end">
+          {/* Action Buttons */}
+          <div className="mt-6 flex justify-between items-center">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleSignOutClick}
+              disabled={signingOut}
+              className="bg-white border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400"
+            >
+              <LogOut className="h-4 w-4 mr-2" />
+              Sign Out
+            </Button>
             <Button
               type="submit"
               disabled={saving}
@@ -375,6 +444,20 @@ export default function ProfilePage() {
             </Button>
           </div>
         </form>
+
+        {/* Change Password Modal */}
+        <ChangePasswordModal
+          isOpen={isChangePasswordModalOpen}
+          onClose={() => setIsChangePasswordModalOpen(false)}
+        />
+
+        {/* Logout Confirmation Modal */}
+        <LogoutConfirmationModal
+          isOpen={isLogoutModalOpen}
+          onClose={() => setIsLogoutModalOpen(false)}
+          onConfirm={handleSignOutConfirm}
+          loading={signingOut}
+        />
       </div>
     </div>
   )

@@ -262,7 +262,7 @@ export default function VendorProductsPage() {
       <div className="container mx-auto px-4 py-8">
         <Button
           variant="ghost"
-          onClick={() => router.push("/vendor")}
+          onClick={() => router.push("/vendor/dashboard")}
           className="mb-6 text-gray-900 hover:text-primary hover:bg-primary/10"
         >
           <ArrowLeft className="h-4 w-4 mr-2" />

@@ -228,7 +228,7 @@ export default function CartPage() {
                     variant="outline"
                     className="w-full border-2 border-gray-300 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-400 font-medium"
                     size="lg"
-                    onClick={() => router.push("/checkout")}
+                    onClick={() => router.push("/checkout?type=self")}
                   >
                     Proceed to Checkout
                   </Button>

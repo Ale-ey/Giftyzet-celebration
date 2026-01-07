@@ -28,6 +28,10 @@ import {
 } from "@/components/ui/dropdown-menu"
 import CartDrawer from "@/components/cart/CartDrawer"
 import AuthModal from "@/components/AuthModal"
+import LogoutConfirmationModal from "@/components/profile/LogoutConfirmationModal"
+import { getCurrentUserWithProfile, signOut as signOutAPI } from "@/lib/api/auth"
+import { supabase } from "@/lib/supabase/client"
+import { useToast } from "@/components/ui/toast"
 
 export default function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
@@ -74,18 +78,19 @@ export default function Header() {
     // Only run on client side
     if (typeof window === "undefined") return
 
-    const updateAuth = () => {
-      const authData = localStorage.getItem("auth")
-      if (authData) {
-        try {
-          const auth = JSON.parse(authData)
+    const updateAuth = async () => {
+      try {
+        const userProfile = await getCurrentUserWithProfile()
+        if (userProfile) {
           setIsLoggedIn(true)
-          setUserEmail(auth.email || "")
-          setUserRole(auth.role || "user")
-        } catch (e) {
+          setUserEmail(userProfile.email || "")
+          setUserRole((userProfile.role as "user" | "admin" | "vendor") || "user")
+        } else {
           setIsLoggedIn(false)
+          setUserEmail("")
+          setUserRole("user")
         }
-      } else {
+      } catch (e) {
         setIsLoggedIn(false)
         setUserEmail("")
         setUserRole("user")
@@ -96,22 +101,52 @@ export default function Header() {
     updateAuth()
     
     // Listen for auth updates
-    window.addEventListener("authUpdated", updateAuth)
-    window.addEventListener("storage", updateAuth)
+    const handleAuthUpdate = () => updateAuth()
+    window.addEventListener("authUpdated", handleAuthUpdate)
+    
+    // Listen to Supabase auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED') {
+        updateAuth()
+      }
+    })
     
     return () => {
-      window.removeEventListener("authUpdated", updateAuth)
-      window.removeEventListener("storage", updateAuth)
+      window.removeEventListener("authUpdated", handleAuthUpdate)
+      subscription.unsubscribe()
     }
   }, [])
 
-  const handleSignOut = () => {
-    // Clear auth data
-    localStorage.removeItem("auth")
-        setIsLoggedIn(false)
-        setUserEmail("")
-        setUserRole("user")
-    setIsMenuOpen(false)
+  const [signingOut, setSigningOut] = useState(false)
+  const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false)
+  const { showToast } = useToast()
+
+  const handleSignOutClick = () => {
+    setIsLogoutModalOpen(true)
+    setIsMenuOpen(false) // Close mobile menu if open
+  }
+
+  const handleSignOutConfirm = async () => {
+    try {
+      setSigningOut(true)
+      await signOutAPI()
+      setIsLogoutModalOpen(false)
+      setIsLoggedIn(false)
+      setUserEmail("")
+      setUserRole("user")
+      setIsMenuOpen(false)
+      showToast("Signed out successfully", "success")
+      // Small delay to show toast before redirect
+      setTimeout(() => {
+        router.push("/")
+      }, 500)
+    } catch (error: any) {
+      console.error("Sign out error:", error)
+      showToast(`Failed to sign out: ${error.message || "Please try again."}`, "error")
+      setIsLogoutModalOpen(false)
+    } finally {
+      setSigningOut(false)
+    }
   }
 
   const userName = userEmail.split("@")[0]
@@ -132,12 +167,6 @@ export default function Header() {
 
           {/* Desktop Navigation */}
           <nav className="hidden lg:flex items-center space-x-4 xl:space-x-6 flex-1 justify-center">
-            <Link href="/wishlist">
-              <Button variant="ghost" className="text-gray-900 hover:text-primary hover:bg-primary/10 text-sm xl:text-base transition-colors">
-                <Heart className="h-4 w-4 mr-2" />
-                Wishlist
-              </Button>
-            </Link>
             <Link href="/marketplace">
               <Button variant="ghost" className="text-gray-900 hover:text-primary hover:bg-primary/10 text-sm xl:text-base transition-colors">
                 <ShoppingBag className="h-4 w-4 mr-2" />
@@ -197,32 +226,26 @@ export default function Header() {
                     <User className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => router.push("/profile")}>
+                <DropdownMenuContent align="end" className="bg-white border border-gray-200 shadow-lg text-black">
+                  <DropdownMenuItem onClick={() => router.push("/profile")} className="cursor-pointer text-black">
                     <Settings className="h-4 w-4 mr-2" />
                     Profile
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => router.push("/contacts")}>
-                    <Users className="h-4 w-4 mr-2" />
-                    My Contacts
+                  <DropdownMenuItem onClick={() => router.push("/wishlist")} className="cursor-pointer text-black">
+                    <Heart className="h-4 w-4 mr-2" />
+                    Wishlist
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => router.push("/my-bookings")}>
-                    <Settings className="h-4 w-4 mr-2" />
-                    My Bookings
-                  </DropdownMenuItem>
-                  {(userRole === "vendor" || userRole === "admin") && (
-                    <DropdownMenuItem onClick={() => router.push("/vendor")}>
+                  {userRole === "vendor" && (
+                    <DropdownMenuItem onClick={() => router.push("/vendor")} className="cursor-pointer text-black">
                       <Store className="h-4 w-4 mr-2" />
                       Vendor Dashboard
                     </DropdownMenuItem>
                   )}
-                  {userRole === "admin" && (
-                    <DropdownMenuItem onClick={() => router.push("/admin")}>
-                      <Settings className="h-4 w-4 mr-2" />
-                      Admin Dashboard
-                    </DropdownMenuItem>
-                  )}
-                  <DropdownMenuItem onClick={handleSignOut}>
+                  <DropdownMenuItem 
+                    onClick={handleSignOutClick}
+                    disabled={signingOut}
+                    className="cursor-pointer text-black"
+                  >
                     <LogOut className="h-4 w-4 mr-2" />
                     Sign Out
                   </DropdownMenuItem>
@@ -290,12 +313,6 @@ export default function Header() {
         {isMenuOpen && (
           <div className="md:hidden mt-4 pb-4 border-t border-border pt-4 animate-in fade-in duration-200">
             <nav className="flex flex-col space-y-2">
-              <Link href="/wishlist" onClick={() => setIsMenuOpen(false)}>
-                <Button variant="ghost" className="justify-start w-full text-gray-900 hover:text-primary hover:bg-primary/10 transition-colors">
-                  <Heart className="h-4 w-4 mr-2" />
-                  Wishlist
-                </Button>
-              </Link>
               <Link href="/marketplace" onClick={() => setIsMenuOpen(false)}>
                 <Button variant="ghost" className="justify-start w-full text-gray-900 hover:text-primary hover:bg-primary/10 transition-colors">
                   <ShoppingBag className="h-4 w-4 mr-2" />
@@ -328,6 +345,12 @@ export default function Header() {
                         Profile
                       </Button>
                     </Link>
+                    <Link href="/wishlist" onClick={() => setIsMenuOpen(false)}>
+                      <Button variant="ghost" size="sm" className="w-full justify-start text-gray-900 hover:text-primary hover:bg-primary/10 transition-colors">
+                        <Heart className="h-4 w-4 mr-2" />
+                        Wishlist
+                      </Button>
+                    </Link>
                     <Link href="/contacts" onClick={() => setIsMenuOpen(false)}>
                       <Button variant="ghost" size="sm" className="w-full justify-start text-gray-900 hover:text-primary hover:bg-primary/10 transition-colors">
                         <Users className="h-4 w-4 mr-2" />
@@ -340,7 +363,7 @@ export default function Header() {
                         My Bookings
                       </Button>
                     </Link>
-                    {(userRole === "vendor" || userRole === "admin") && (
+                    {userRole === "vendor" && (
                       <Link href="/vendor" onClick={() => setIsMenuOpen(false)}>
                         <Button variant="ghost" size="sm" className="w-full justify-start text-gray-900 hover:text-primary hover:bg-primary/10 transition-colors">
                           <Store className="h-4 w-4 mr-2" />
@@ -359,9 +382,8 @@ export default function Header() {
                     <Button 
                       variant="outline" 
                       size="sm" 
-                      onClick={() => { 
-                        handleSignOut()
-                      }} 
+                      onClick={handleSignOutClick}
+                      disabled={signingOut}
                       className="w-full justify-start text-gray-900 hover:text-primary hover:border-primary transition-colors"
                     >
                       <LogOut className="h-4 w-4 mr-2" />
@@ -399,6 +421,14 @@ export default function Header() {
         
         {/* Auth Modal */}
         <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} />
+
+        {/* Logout Confirmation Modal */}
+        <LogoutConfirmationModal
+          isOpen={isLogoutModalOpen}
+          onClose={() => setIsLogoutModalOpen(false)}
+          onConfirm={handleSignOutConfirm}
+          loading={signingOut}
+        />
       </header>
     )
   }

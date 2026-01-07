@@ -28,9 +28,31 @@ export default function VendorSignUpPage() {
   useEffect(() => {
     // Check if already logged in
     getCurrentUser()
-      .then((user) => {
+      .then(async (user) => {
         if (user) {
-          router.push("/vendor")
+          // Check store status and redirect accordingly
+          try {
+            const { getCurrentUserWithProfile } = await import("@/lib/api/auth")
+            const { getVendorByUserId, getStoreByVendorId } = await import("@/lib/api/vendors")
+            const userProfile = await getCurrentUserWithProfile()
+            if (userProfile?.role === "vendor") {
+              const vendor = await getVendorByUserId(user.id)
+              if (vendor) {
+                const store = await getStoreByVendorId(vendor.id)
+                if (!store || store.status === "pending" || store.status === "rejected") {
+                  router.push("/vendor/register-store")
+                } else {
+                  router.push("/vendor")
+                }
+              } else {
+                router.push("/vendor/register-store")
+              }
+            } else {
+              router.push("/vendor")
+            }
+          } catch {
+            router.push("/vendor")
+          }
         }
       })
       .catch(() => {
@@ -107,9 +129,9 @@ export default function VendorSignUpPage() {
         setSuccess(true)
         window.dispatchEvent(new Event("authUpdated"))
         
-        // Redirect after a short delay
+        // Redirect to store registration after a short delay
         setTimeout(() => {
-        router.push("/vendor")
+        router.push("/vendor/register-store")
       }, 2000)
       } catch (vendorError: any) {
         // If vendor creation fails, still show email confirmation
@@ -158,8 +180,8 @@ export default function VendorSignUpPage() {
             <CheckCircle className="h-16 w-16 text-primary mx-auto mb-4" />
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Vendor Account Created!</h2>
             <p className="text-gray-600 mb-4">
-              Your vendor account has been created. Your store is pending approval.
-              Redirecting to your dashboard...
+              Your vendor account has been created. Please complete your store registration to start selling.
+              Redirecting to store registration...
             </p>
           </CardContent>
         </Card>

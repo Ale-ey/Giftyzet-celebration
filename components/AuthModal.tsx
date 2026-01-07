@@ -52,8 +52,30 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
           onClose()
           resetForm()
           
-          // Redirect to marketplace after login
-          router.push("/marketplace")
+          // Check if user is vendor and redirect accordingly
+          const { getCurrentUserWithProfile } = await import("@/lib/api/auth")
+          try {
+            const userProfile = await getCurrentUserWithProfile()
+            if (userProfile?.role === "vendor") {
+              // Check store status for vendors
+              const { getVendorByUserId, getStoreByVendorId } = await import("@/lib/api/vendors")
+              const vendor = await getVendorByUserId(user.id)
+              if (vendor) {
+                const store = await getStoreByVendorId(vendor.id)
+                if (!store || store.status === "pending" || store.status === "rejected") {
+                  router.push("/vendor/register-store")
+                } else {
+                  router.push("/vendor")
+                }
+              } else {
+                router.push("/vendor/register-store")
+              }
+            } else {
+              router.push("/marketplace")
+            }
+          } catch {
+            router.push("/marketplace")
+          }
         }
       } else if (mode === "signup") {
         // User sign up
@@ -123,7 +145,8 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
             window.dispatchEvent(new Event("authUpdated"))
             onClose()
             resetForm()
-            router.push("/vendor")
+            // Redirect to store registration page
+            router.push("/vendor/register-store")
           } catch (vendorError: any) {
             // If vendor creation fails, still show email confirmation
             // Vendor can be created after email confirmation

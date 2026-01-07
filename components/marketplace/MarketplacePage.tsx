@@ -105,7 +105,7 @@ export default function MarketplacePage() {
             </div>
 
             {filteredProducts.length === 0 ? (
-              <Card className="border-2 border-gray-100">
+              <Card className="border border-gray-200 bg-white">
                 <CardContent className="p-12 text-center">
                   <p className="text-gray-600 text-lg mb-2">No products found</p>
                   <p className="text-gray-500 text-sm">

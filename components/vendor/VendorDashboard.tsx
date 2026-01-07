@@ -7,9 +7,7 @@ import {
   Package, 
   ShoppingBag, 
   Settings,
-  CheckCircle2,
-  Clock,
-  XCircle
+  DollarSign
 } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -21,6 +19,9 @@ export default function VendorDashboard() {
   const [store, setStore] = useState<StoreType | null>(null)
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
+  const [totalRevenue, setTotalRevenue] = useState(0)
+  const [monthlyRevenue, setMonthlyRevenue] = useState(0)
+  const [totalOrders, setTotalOrders] = useState(0)
 
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -94,6 +95,23 @@ export default function VendorDashboard() {
     const vendorOrders = getOrdersByVendorId(vendor.id)
     setOrders(vendorOrders)
 
+    // Calculate revenue and orders
+    const allRevenue = vendorOrders
+      .filter((o) => o.status !== "cancelled")
+      .reduce((sum, o) => sum + o.total, 0)
+    
+    const now = new Date()
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+    const monthlyOrders = vendorOrders.filter((o) => {
+      const orderDate = new Date(o.createdAt)
+      return orderDate >= startOfMonth && o.status !== "cancelled"
+    })
+    const monthlyRev = monthlyOrders.reduce((sum, o) => sum + o.total, 0)
+
+    setTotalRevenue(allRevenue)
+    setMonthlyRevenue(monthlyRev)
+    setTotalOrders(vendorOrders.length)
+
     setLoading(false)
 
     // Listen for updates
@@ -102,6 +120,23 @@ export default function VendorDashboard() {
       setStore(updatedStore || null)
       const updatedOrders = getOrdersByVendorId(vendor.id)
       setOrders(updatedOrders)
+      
+      // Recalculate revenue
+      const allRev = updatedOrders
+        .filter((o) => o.status !== "cancelled")
+        .reduce((sum, o) => sum + o.total, 0)
+      
+      const now = new Date()
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+      const monthlyOrders = updatedOrders.filter((o) => {
+        const orderDate = new Date(o.createdAt)
+        return orderDate >= startOfMonth && o.status !== "cancelled"
+      })
+      const monthlyRev = monthlyOrders.reduce((sum, o) => sum + o.total, 0)
+
+      setTotalRevenue(allRev)
+      setMonthlyRevenue(monthlyRev)
+      setTotalOrders(updatedOrders.length)
     }
 
     window.addEventListener("storesUpdated", handleUpdate)
@@ -151,75 +186,54 @@ export default function VendorDashboard() {
           <p className="text-gray-600">Manage your store, products, and orders</p>
         </div>
 
-        {/* Store Status */}
-        <Card className="border border-gray-200 bg-white mb-6">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="text-xl text-gray-900">Store Status</CardTitle>
-                <CardDescription className="text-gray-600">
-                  {store.name}
-                </CardDescription>
-              </div>
-              {store.status === "pending" && (
-                <div className="flex items-center gap-2 px-4 py-2 bg-yellow-50 border border-yellow-200 rounded-lg">
-                  <Clock className="h-5 w-5 text-yellow-600" />
-                  <span className="text-yellow-700 font-medium">Pending Approval</span>
+        {/* Revenue and Order Stats */}
+        {store.status === "approved" && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+            <Card className="border border-gray-200 bg-white">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-600 mb-1">Total Revenue</p>
+                    <p className="text-2xl font-bold text-gray-900">${totalRevenue.toFixed(2)}</p>
+                  </div>
+                  <div className="bg-primary/10 p-3 rounded-full">
+                    <DollarSign className="h-6 w-6 text-primary" />
+                  </div>
                 </div>
-              )}
-              {store.status === "approved" && (
-                <div className="flex items-center gap-2 px-4 py-2 bg-green-50 border border-green-200 rounded-lg">
-                  <CheckCircle2 className="h-5 w-5 text-green-600" />
-                  <span className="text-green-700 font-medium">Approved</span>
-                </div>
-              )}
-              {store.status === "suspended" && (
-                <div className="flex items-center gap-2 px-4 py-2 bg-red-50 border border-red-200 rounded-lg">
-                  <XCircle className="h-5 w-5 text-red-600" />
-                  <span className="text-red-700 font-medium">Suspended</span>
-                </div>
-              )}
-            </div>
-          </CardHeader>
-          <CardContent>
-            {store.status === "pending" && (
-              <p className="text-gray-600 mb-4">
-                Your store registration is pending admin approval. You'll be able to set up your store and list products once approved.
-              </p>
-            )}
-            {store.status === "approved" && (
-              <div className="space-y-4">
-                <p className="text-gray-600">
-                  Your store has been approved! You can now set up your store and start listing products.
-                </p>
-                <div className="flex gap-4">
-                  <Button
-                    onClick={() => router.push("/vendor/store")}
-                    className="border-2 border-gray-300 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-400"
-                  >
-                    <Settings className="h-4 w-4 mr-2" />
-                    Setup Store
-                  </Button>
-                  <Button
-                    onClick={() => router.push("/vendor/products")}
-                    variant="outline"
-                    className="border-2 border-gray-300 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-400"
-                  >
-                    <Package className="h-4 w-4 mr-2" />
-                    Manage Products
-                  </Button>
-                </div>
-              </div>
-            )}
-            {store.status === "suspended" && (
-              <p className="text-gray-600">
-                Your store has been suspended. Please contact support for more information.
-              </p>
-            )}
-          </CardContent>
-        </Card>
+              </CardContent>
+            </Card>
 
-        {/* Quick Stats */}
+            <Card className="border border-gray-200 bg-white">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-600 mb-1">Revenue This Month</p>
+                    <p className="text-2xl font-bold text-gray-900">${monthlyRevenue.toFixed(2)}</p>
+                  </div>
+                  <div className="bg-green-100 p-3 rounded-full">
+                    <DollarSign className="h-6 w-6 text-green-600" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border border-gray-200 bg-white">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-600 mb-1">Total Orders</p>
+                    <p className="text-2xl font-bold text-gray-900">{totalOrders}</p>
+                  </div>
+                  <div className="bg-blue-100 p-3 rounded-full">
+                    <ShoppingBag className="h-6 w-6 text-blue-600" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Order Status Stats */}
         {store.status === "approved" && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
             <Card className="border border-gray-200 bg-white">

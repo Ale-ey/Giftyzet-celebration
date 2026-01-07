@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import { X, Upload, Trash2 } from "lucide-react"
 import {
   Dialog,
@@ -19,9 +19,10 @@ interface AddProductDialogProps {
   isOpen: boolean
   onClose: () => void
   onSave: (product: Omit<Product, "id" | "rating" | "reviews" | "vendor">) => void
+  editProduct?: Product | null
 }
 
-export default function AddProductDialog({ isOpen, onClose, onSave }: AddProductDialogProps) {
+export default function AddProductDialog({ isOpen, onClose, onSave, editProduct }: AddProductDialogProps) {
   const [formData, setFormData] = useState({
     name: "",
     description: "",
@@ -29,10 +30,44 @@ export default function AddProductDialog({ isOpen, onClose, onSave }: AddProduct
     originalPrice: "",
     category: "",
     discount: "",
-    stock: ""
+    stock: "",
+    available: true
   })
   const [images, setImages] = useState<string[]>([])
   const fileInputRefs = useRef<(HTMLInputElement | null)[]>([])
+
+  // Load product data when editing
+  useEffect(() => {
+    if (editProduct && isOpen) {
+      setFormData({
+        name: editProduct.name || "",
+        description: editProduct.description || "",
+        price: editProduct.price.replace("$", "") || "",
+        originalPrice: editProduct.originalPrice.replace("$", "") || "",
+        category: editProduct.category || "",
+        discount: editProduct.discount || "",
+        stock: editProduct.stock?.toString() || "",
+        available: editProduct.available !== false
+      })
+      setImages(editProduct.image ? [editProduct.image] : [])
+    } else if (!editProduct && isOpen) {
+      // Reset form when adding new product
+      setFormData({
+        name: "",
+        description: "",
+        price: "",
+        originalPrice: "",
+        category: "",
+        discount: "",
+        stock: "",
+        available: true
+      })
+      setImages([])
+      fileInputRefs.current.forEach(ref => {
+        if (ref) ref.value = ""
+      })
+    }
+  }, [editProduct, isOpen])
 
   const handleImageUpload = (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -74,7 +109,7 @@ export default function AddProductDialog({ isOpen, onClose, onSave }: AddProduct
       return
     }
 
-    if (images.length === 0) {
+    if (images.length === 0 && !editProduct) {
       alert("Please upload at least one image")
       return
     }
@@ -99,7 +134,8 @@ export default function AddProductDialog({ isOpen, onClose, onSave }: AddProduct
       image: images[0], // Use first image as main image
       discount: discount || "",
       description: formData.description,
-      stock: formData.stock ? parseInt(formData.stock) : undefined
+      stock: formData.stock ? parseInt(formData.stock) : undefined,
+      available: formData.available
     })
 
     // Reset form
@@ -110,7 +146,8 @@ export default function AddProductDialog({ isOpen, onClose, onSave }: AddProduct
       originalPrice: "",
       category: "",
       discount: "",
-      stock: ""
+      stock: "",
+      available: true
     })
     setImages([])
     fileInputRefs.current.forEach(ref => {
@@ -123,9 +160,11 @@ export default function AddProductDialog({ isOpen, onClose, onSave }: AddProduct
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-2xl bg-white max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-2xl font-bold text-gray-900">Add New Product</DialogTitle>
+          <DialogTitle className="text-2xl font-bold text-gray-900">
+            {editProduct ? "Edit Product" : "Add New Product"}
+          </DialogTitle>
           <DialogDescription className="text-gray-600">
-            Fill in the product details and upload images
+            {editProduct ? "Update the product details and images" : "Fill in the product details and upload images"}
           </DialogDescription>
         </DialogHeader>
 
@@ -203,6 +242,19 @@ export default function AddProductDialog({ isOpen, onClose, onSave }: AddProduct
               placeholder="Enter stock quantity"
             />
             <p className="text-xs text-gray-500">Leave empty for unlimited stock</p>
+          </div>
+
+          <div className="flex items-center space-x-2">
+            <input
+              type="checkbox"
+              id="available"
+              checked={formData.available}
+              onChange={(e) => setFormData({ ...formData, available: e.target.checked })}
+              className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary"
+            />
+            <label htmlFor="available" className="text-sm font-semibold text-gray-900">
+              Available for purchase
+            </label>
           </div>
 
           <div className="space-y-2">
@@ -287,7 +339,7 @@ export default function AddProductDialog({ isOpen, onClose, onSave }: AddProduct
               type="submit"
               className="border-2 border-gray-300 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-400"
             >
-              Add Product
+              {editProduct ? "Update Product" : "Add Product"}
             </Button>
           </DialogFooter>
         </form>

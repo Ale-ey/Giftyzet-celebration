@@ -11,6 +11,7 @@ export interface Product {
   discount: string
   description?: string
   stock?: number
+  available?: boolean
 }
 
 export interface Feature {
@@ -45,6 +46,7 @@ export interface Service {
   description?: string
   duration?: string
   location?: string
+  available?: boolean
 }
 
 export interface Vendor {
@@ -87,6 +89,9 @@ export interface Order {
   dispatchedAt?: string
   deliveredAt?: string
   shippingAddress?: string
+  orderType?: "self" | "gift"
+  senderAddress?: string
+  receiverAddress?: string
 }
 
 export interface OrderItem {

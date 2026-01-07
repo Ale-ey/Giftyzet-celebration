@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import { X, Upload } from "lucide-react"
 import {
   Dialog,
@@ -19,9 +19,10 @@ interface AddServiceDialogProps {
   isOpen: boolean
   onClose: () => void
   onSave: (service: Omit<Service, "id" | "rating" | "reviews" | "vendor">) => void
+  editService?: Service | null
 }
 
-export default function AddServiceDialog({ isOpen, onClose, onSave }: AddServiceDialogProps) {
+export default function AddServiceDialog({ isOpen, onClose, onSave, editService }: AddServiceDialogProps) {
   const [formData, setFormData] = useState({
     name: "",
     description: "",
@@ -30,10 +31,46 @@ export default function AddServiceDialog({ isOpen, onClose, onSave }: AddService
     category: "",
     discount: "",
     duration: "",
-    location: ""
+    location: "",
+    available: true
   })
   const [images, setImages] = useState<string[]>([])
   const fileInputRefs = useRef<(HTMLInputElement | null)[]>([])
+
+  // Load service data when editing
+  useEffect(() => {
+    if (editService && isOpen) {
+      setFormData({
+        name: editService.name || "",
+        description: editService.description || "",
+        price: editService.price.replace("$", "") || "",
+        originalPrice: editService.originalPrice.replace("$", "") || "",
+        category: editService.category || "",
+        discount: editService.discount || "",
+        duration: editService.duration || "",
+        location: editService.location || "",
+        available: editService.available !== false
+      })
+      setImages(editService.image ? [editService.image] : [])
+    } else if (!editService && isOpen) {
+      // Reset form when adding new service
+      setFormData({
+        name: "",
+        description: "",
+        price: "",
+        originalPrice: "",
+        category: "",
+        discount: "",
+        duration: "",
+        location: "",
+        available: true
+      })
+      setImages([])
+      fileInputRefs.current.forEach(ref => {
+        if (ref) ref.value = ""
+      })
+    }
+  }, [editService, isOpen])
 
   const handleImageUpload = (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -75,7 +112,7 @@ export default function AddServiceDialog({ isOpen, onClose, onSave }: AddService
       return
     }
 
-    if (images.length === 0) {
+    if (images.length === 0 && !editService) {
       alert("Please upload at least one image")
       return
     }
@@ -101,7 +138,8 @@ export default function AddServiceDialog({ isOpen, onClose, onSave }: AddService
       discount: discount || "",
       description: formData.description,
       duration: formData.duration || undefined,
-      location: formData.location || undefined
+      location: formData.location || undefined,
+      available: formData.available
     })
 
     // Reset form
@@ -113,7 +151,8 @@ export default function AddServiceDialog({ isOpen, onClose, onSave }: AddService
       category: "",
       discount: "",
       duration: "",
-      location: ""
+      location: "",
+      available: true
     })
     setImages([])
     fileInputRefs.current.forEach(ref => {
@@ -126,9 +165,11 @@ export default function AddServiceDialog({ isOpen, onClose, onSave }: AddService
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-2xl bg-white max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-2xl font-bold text-gray-900">Add New Service</DialogTitle>
+          <DialogTitle className="text-2xl font-bold text-gray-900">
+            {editService ? "Edit Service" : "Add New Service"}
+          </DialogTitle>
           <DialogDescription className="text-gray-600">
-            Fill in the service details and upload images
+            {editService ? "Update the service details and images" : "Fill in the service details and upload images"}
           </DialogDescription>
         </DialogHeader>
 
@@ -240,6 +281,19 @@ export default function AddServiceDialog({ isOpen, onClose, onSave }: AddService
             </select>
           </div>
 
+          <div className="flex items-center space-x-2">
+            <input
+              type="checkbox"
+              id="available"
+              checked={formData.available}
+              onChange={(e) => setFormData({ ...formData, available: e.target.checked })}
+              className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary"
+            />
+            <label htmlFor="available" className="text-sm font-semibold text-gray-900">
+              Available for booking
+            </label>
+          </div>
+
           <div className="space-y-2">
             <label className="text-sm font-semibold text-gray-900">
               Service Images * (Upload up to 5 images)
@@ -302,7 +356,7 @@ export default function AddServiceDialog({ isOpen, onClose, onSave }: AddService
               type="submit"
               className="border-2 border-gray-300 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-400"
             >
-              Add Service
+              {editService ? "Update Service" : "Add Service"}
             </Button>
           </DialogFooter>
         </form>

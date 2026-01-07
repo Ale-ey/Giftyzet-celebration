@@ -6,7 +6,9 @@ import { ArrowLeft, CheckCircle2, Truck, Package, Clock, XCircle } from "lucide-
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { Pagination } from "@/components/ui/pagination"
 import { getStoreByVendorId, getOrdersByVendorId, updateOrderStatus } from "@/lib/vendor-data"
+import OrderDetailModal from "./OrderDetailModal"
 import type { Store, Order } from "@/types"
 
 export default function VendorOrdersPage() {
@@ -15,38 +17,85 @@ export default function VendorOrdersPage() {
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<Order["status"] | "all">("all")
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
+  const [isOrderModalOpen, setIsOrderModalOpen] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 10
 
   useEffect(() => {
     if (typeof window === "undefined") return
 
-    const { getVendors, saveVendor, saveStore } = require("@/lib/vendor-data")
-    const vendors = getVendors()
+    // Get logged-in vendor from auth
+    const authData = localStorage.getItem("auth")
+    let vendor = null
     
-    // Use first vendor if exists, or create a demo vendor
-    let vendor = vendors[0]
-    
-    if (!vendor) {
-      const vendorId = `vendor-${Date.now()}`
-      vendor = {
-        id: vendorId,
-        email: "demo@vendor.com",
-        name: "Demo Vendor",
-        vendorName: "Demo Store",
-        role: "vendor" as const,
-        createdAt: new Date().toISOString()
+    if (authData) {
+      try {
+        const auth = JSON.parse(authData)
+        if (auth.role === "vendor" && auth.vendorName) {
+          const { getVendors, saveVendor, saveStore } = require("@/lib/vendor-data")
+          const vendors = getVendors()
+          vendor = vendors.find((v: any) => v.email === auth.email || v.vendorName === auth.vendorName)
+          
+          if (!vendor && auth.vendorName) {
+            const vendorId = `vendor-${Date.now()}`
+            vendor = {
+              id: vendorId,
+              email: auth.email || "demo@vendor.com",
+              name: auth.name || "Vendor",
+              vendorName: auth.vendorName,
+              role: "vendor" as const,
+              createdAt: new Date().toISOString()
+            }
+            saveVendor(vendor)
+            
+            const store = {
+              id: `store-${Date.now()}`,
+              vendorId,
+              name: auth.vendorName,
+              status: "approved" as const,
+              createdAt: new Date().toISOString()
+            }
+            saveStore(store)
+          }
+        }
+      } catch (e) {
+        console.error("Error parsing auth data:", e)
       }
-      saveVendor(vendor)
-      
-      // Create store with approved status for testing
-      const store = {
-        id: `store-${Date.now()}`,
-        vendorId,
-        name: "Demo Store",
-        status: "approved" as const,
-        createdAt: new Date().toISOString()
-      }
-      saveStore(store)
     }
+    
+    // Fallback to first vendor or create demo vendor
+    if (!vendor) {
+      const { getVendors, saveVendor, saveStore } = require("@/lib/vendor-data")
+      const vendors = getVendors()
+      vendor = vendors[0]
+      
+      if (!vendor) {
+        const vendorId = `vendor-${Date.now()}`
+        vendor = {
+          id: vendorId,
+          email: "demo@vendor.com",
+          name: "Demo Vendor",
+          vendorName: "Demo Store",
+          role: "vendor" as const,
+          createdAt: new Date().toISOString()
+        }
+        saveVendor(vendor)
+        
+        const store = {
+          id: `store-${Date.now()}`,
+          vendorId,
+          name: "Demo Store",
+          status: "approved" as const,
+          createdAt: new Date().toISOString()
+        }
+        saveStore(store)
+      }
+    }
+
+    // Initialize dummy orders for this vendor
+    const { initializeDummyOrders } = require("@/lib/product-data")
+    initializeDummyOrders(vendor.id, vendor.vendorName)
 
     const vendorStore = getStoreByVendorId(vendor.id)
     setStore(vendorStore || null)
@@ -78,6 +127,18 @@ export default function VendorOrdersPage() {
   const filteredOrders = filter === "all" 
     ? orders 
     : orders.filter((o) => o.status === filter)
+
+  // Pagination calculations
+  const totalPages = Math.ceil(filteredOrders.length / itemsPerPage)
+  const startIndex = (currentPage - 1) * itemsPerPage
+  const endIndex = startIndex + itemsPerPage
+  const paginatedOrders = filteredOrders.slice(startIndex, endIndex)
+
+  // Reset to page 1 when filter changes
+  const handleFilterChange = (newFilter: Order["status"] | "all") => {
+    setFilter(newFilter)
+    setCurrentPage(1)
+  }
 
   if (loading) {
     return (
@@ -148,7 +209,7 @@ export default function VendorOrdersPage() {
         <div className="flex gap-2 mb-6 flex-wrap">
           <Button
             variant={filter === "all" ? "default" : "outline"}
-            onClick={() => setFilter("all")}
+            onClick={() => handleFilterChange("all")}
             className={filter === "all" 
               ? "bg-primary text-white" 
               : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
@@ -158,7 +219,7 @@ export default function VendorOrdersPage() {
           </Button>
           <Button
             variant={filter === "pending" ? "default" : "outline"}
-            onClick={() => setFilter("pending")}
+            onClick={() => handleFilterChange("pending")}
             className={filter === "pending" 
               ? "bg-primary text-white" 
               : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
@@ -168,7 +229,7 @@ export default function VendorOrdersPage() {
           </Button>
           <Button
             variant={filter === "confirmed" ? "default" : "outline"}
-            onClick={() => setFilter("confirmed")}
+            onClick={() => handleFilterChange("confirmed")}
             className={filter === "confirmed" 
               ? "bg-primary text-white" 
               : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
@@ -178,7 +239,7 @@ export default function VendorOrdersPage() {
           </Button>
           <Button
             variant={filter === "dispatched" ? "default" : "outline"}
-            onClick={() => setFilter("dispatched")}
+            onClick={() => handleFilterChange("dispatched")}
             className={filter === "dispatched" 
               ? "bg-primary text-white" 
               : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
@@ -203,9 +264,17 @@ export default function VendorOrdersPage() {
             </CardContent>
           </Card>
         ) : (
-          <div className="space-y-4">
-            {filteredOrders.map((order) => (
-              <Card key={order.id} className="border border-gray-200 bg-white">
+          <>
+            <div className="space-y-4">
+              {paginatedOrders.map((order) => (
+              <Card 
+                key={order.id} 
+                className="border border-gray-200 bg-white cursor-pointer hover:shadow-md transition-shadow"
+                onClick={() => {
+                  setSelectedOrder(order)
+                  setIsOrderModalOpen(true)
+                }}
+              >
                 <CardHeader>
                   <div className="flex items-start justify-between">
                     <div>
@@ -219,11 +288,11 @@ export default function VendorOrdersPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {/* Order Items */}
+                    {/* Order Items Preview */}
                     <div>
-                      <h4 className="font-semibold text-gray-900 mb-2">Items:</h4>
+                      <h4 className="font-semibold text-gray-900 mb-2">Items ({order.items.length}):</h4>
                       <div className="space-y-2">
-                        {order.items.map((item, idx) => (
+                        {order.items.slice(0, 2).map((item, idx) => (
                           <div key={idx} className="flex items-center justify-between p-2 bg-gray-50 rounded">
                             <div className="flex items-center gap-3">
                               {item.image && (
@@ -243,6 +312,11 @@ export default function VendorOrdersPage() {
                             <p className="font-semibold text-gray-900">{item.price}</p>
                           </div>
                         ))}
+                        {order.items.length > 2 && (
+                          <p className="text-sm text-gray-500 text-center py-2">
+                            +{order.items.length - 2} more item(s) - Click to view details
+                          </p>
+                        )}
                       </div>
                     </div>
 
@@ -257,42 +331,37 @@ export default function VendorOrdersPage() {
                       Ordered: {new Date(order.createdAt).toLocaleDateString()}
                     </p>
 
-                    {/* Action Buttons */}
-                    <div className="flex gap-2 pt-4">
-                      {order.status === "pending" && (
-                        <Button
-                          onClick={() => handleStatusUpdate(order.id, "confirmed")}
-                          className="border-2 border-gray-300 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-400"
-                        >
-                          <CheckCircle2 className="h-4 w-4 mr-2" />
-                          Confirm Order
-                        </Button>
-                      )}
-                      {order.status === "confirmed" && (
-                        <Button
-                          onClick={() => handleStatusUpdate(order.id, "dispatched")}
-                          className="border-2 border-gray-300 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-400"
-                        >
-                          <Truck className="h-4 w-4 mr-2" />
-                          Mark as Dispatched
-                        </Button>
-                      )}
-                      {order.status === "dispatched" && (
-                        <Button
-                          onClick={() => handleStatusUpdate(order.id, "delivered")}
-                          className="border-2 border-gray-300 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-400"
-                        >
-                          <Package className="h-4 w-4 mr-2" />
-                          Mark as Delivered
-                        </Button>
-                      )}
-                    </div>
+                    {/* Click hint */}
+                    <p className="text-xs text-gray-500 text-center pt-2 border-t border-gray-100">
+                      Click anywhere on this card to view full order details
+                    </p>
                   </div>
                 </CardContent>
               </Card>
-            ))}
-          </div>
+              ))}
+            </div>
+
+            {/* Pagination */}
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+              itemsPerPage={itemsPerPage}
+              totalItems={filteredOrders.length}
+            />
+          </>
         )}
+
+        {/* Order Detail Modal */}
+        <OrderDetailModal
+          isOpen={isOrderModalOpen}
+          onClose={() => {
+            setIsOrderModalOpen(false)
+            setSelectedOrder(null)
+          }}
+          order={selectedOrder}
+          onStatusUpdate={handleStatusUpdate}
+        />
       </div>
     </div>
   )

@@ -168,7 +168,7 @@ export default function VendorStoreSetup() {
           Back to Dashboard
         </Button>
 
-        <div className="max-w-3xl mx-auto">
+        <div className="max-w-5xl mx-auto">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Store Setup</h1>
           <p className="text-gray-600 mb-8">Configure your store details and information</p>
 

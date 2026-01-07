@@ -158,10 +158,10 @@ export default function MarketplacePreview() {
                 <Button 
                   size="sm" 
                   variant="outline"
-                  className="w-full border-2 border-gray-300 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-400 font-semibold"
-                  onClick={(e) => handleBuyNow(e, product)}
+                  className="w-full border-2 border-gray-300 bg-white text-gray-700 hover:bg-red-600 hover:text-white hover:border-red-600 font-semibold"
+                  onClick={(e) => handleGiftNow(e, product)}
                 >
-                  Buy Now
+                  Send Gift
                 </Button>
               </CardContent>
             </Card>

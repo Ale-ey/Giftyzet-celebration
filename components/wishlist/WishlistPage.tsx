@@ -182,7 +182,7 @@ export default function WishlistPage() {
     saveWishlists(updatedWishlists)
   }
 
-  const handleBuyNow = (product: Product) => {
+  const handleSendGift = (product: Product) => {
     const cartItem = {
       ...product,
       quantity: 1
@@ -198,7 +198,7 @@ export default function WishlistPage() {
     
     localStorage.setItem("cart", JSON.stringify(existingCart))
     window.dispatchEvent(new Event("cartUpdated"))
-    router.push(`/product/${product.id}`)
+    router.push(`/send-gift?product=${encodeURIComponent(JSON.stringify(product))}`)
   }
 
   return (
@@ -456,11 +456,11 @@ export default function WishlistPage() {
                               <Button
                                 variant="outline"
                                 size="sm"
-                                className="h-8 w-8 p-0 border-gray-200 bg-white text-gray-600 hover:bg-gray-50 hover:border-gray-300"
-                                onClick={() => handleBuyNow(item)}
-                                title="Buy Now"
+                                className="h-8 w-8 p-0 border-gray-200 bg-white text-gray-600 hover:bg-red-600 hover:text-white hover:border-red-600"
+                                onClick={() => handleSendGift(item)}
+                                title="Send Gift"
                               >
-                                <ShoppingCart className="h-4 w-4" />
+                                <Gift className="h-4 w-4" />
                               </Button>
                               <Button
                                 variant="outline"

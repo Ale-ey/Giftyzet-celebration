@@ -298,11 +298,11 @@ export default function VendorStorePage({ vendorName }: VendorStorePageProps) {
                     <Button
                       size="sm"
                       variant="outline"
-                      className="flex-1 border-2 border-gray-300 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-400 font-medium"
-                      onClick={() => handleBuyNow(product)}
+                      className="flex-1 border-2 border-gray-300 bg-white text-gray-700 hover:bg-red-600 hover:text-white hover:border-red-600 font-medium"
+                      onClick={() => handleGiftNow(product)}
                     >
-                      <ShoppingCart className="h-4 w-4 mr-1" />
-                      Buy Now
+                      <Gift className="h-4 w-4 mr-1" />
+                      Send Gift
                     </Button>
                     <Button
                       size="sm"

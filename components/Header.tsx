@@ -239,7 +239,7 @@ export default function Header() {
               </Button>
             )}
             
-            <Link href="/send-gift">
+            <Link href="/marketplace">
               <Button className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg text-xs sm:text-sm lg:text-base px-3 lg:px-4 transition-colors">
                 <span className="hidden xl:inline">Start Gifting</span>
                 <span className="xl:hidden">Gift</span>
@@ -382,7 +382,7 @@ export default function Header() {
                     Sign In
                   </Button>
                 )}
-                <Link href="/send-gift" onClick={() => setIsMenuOpen(false)}>
+                <Link href="/marketplace" onClick={() => setIsMenuOpen(false)}>
                   <Button className="bg-primary hover:bg-primary/90 text-primary-foreground w-full transition-colors">
                     <Gift className="h-4 w-4 mr-2" />
                     Start Gifting

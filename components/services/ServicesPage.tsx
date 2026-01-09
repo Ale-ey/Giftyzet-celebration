@@ -31,6 +31,10 @@ export default function ServicesPage() {
     try {
       setLoading(true)
       const data = await getApprovedServices()
+      console.log("Services data:", data)
+      if (data && data.length > 0) {
+        console.log("First service stores:", data[0].stores)
+      }
       setServices(data || [])
     } catch (error) {
       console.error("Error loading services:", error)
@@ -64,7 +68,7 @@ export default function ServicesPage() {
       image: service.image_url,
       quantity: 1,
       type: "service",
-      vendor: service.stores?.vendors?.vendor_name || "Unknown Vendor"
+      vendor: service.stores?.vendors?.vendor_name || service.stores?.name || "Unknown Vendor"
     }
     const existingCart = JSON.parse(localStorage.getItem("cart") || "[]")
     const existingItemIndex = existingCart.findIndex((item: any) => item.id === service.id && item.type === "service")
@@ -209,7 +213,7 @@ export default function ServicesPage() {
                             {service.name}
                           </h3>
                           <p className="text-xs text-gray-500">
-                            by {service.stores?.vendors?.vendor_name || "Unknown Vendor"}
+                            by {service.stores?.vendors?.vendor_name || service.stores?.name || "Unknown Vendor"}
                           </p>
                         </div>
                         

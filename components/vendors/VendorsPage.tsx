@@ -87,8 +87,8 @@ export default function VendorsPage() {
     })
   }, [vendorsData, searchQuery, selectedCategory])
 
-  const handleVendorClick = (storeId: string) => {
-    router.push(`/store/${storeId}`)
+  const handleVendorClick = (storeName: string) => {
+    router.push(`/vendors/${encodeURIComponent(storeName)}`)
   }
 
   const handleProductClick = (productId: string, type: string) => {
@@ -270,7 +270,7 @@ export default function VendorsPage() {
                       <Button
                         variant="outline"
                         className="flex-1 border-2 border-gray-300 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-400 font-medium"
-                        onClick={() => handleVendorClick(vendor.id)}
+                        onClick={() => handleVendorClick(vendor.name)}
                       >
                         View Store
                       </Button>

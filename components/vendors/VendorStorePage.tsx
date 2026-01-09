@@ -1,14 +1,13 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { ArrowLeft, Store, Star, ShoppingCart, Gift, Search, Filter } from "lucide-react"
+import { ArrowLeft, Store, Star, ShoppingCart, Gift, Search, Package } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
-import { allProducts } from "@/lib/constants"
-import type { Product } from "@/types"
+import { getStoreByName, getStoreWithStats, getStoreProductsAndServices } from "@/lib/api/vendors"
 
 interface VendorStorePageProps {
   vendorName: string
@@ -18,62 +17,97 @@ export default function VendorStorePage({ vendorName }: VendorStorePageProps) {
   const router = useRouter()
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedCategory, setSelectedCategory] = useState("all")
+  const [selectedType, setSelectedType] = useState<"all" | "products" | "services">("all")
+  const [loading, setLoading] = useState(true)
+  const [storeData, setStoreData] = useState<any>(null)
+  const [products, setProducts] = useState<any[]>([])
+  const [services, setServices] = useState<any[]>([])
 
-  // Get vendor products
-  const vendorProducts = useMemo(() => {
-    return allProducts.filter(product => product.vendor === vendorName)
+  // Load store data
+  useEffect(() => {
+    loadStoreData()
   }, [vendorName])
 
-  // Calculate vendor stats
-  const vendorStats = useMemo(() => {
-    if (vendorProducts.length === 0) return null
+  const loadStoreData = async () => {
+    try {
+      setLoading(true)
+      // Get store by name
+      const store = await getStoreByName(vendorName)
+      
+      if (!store) {
+        setStoreData(null)
+        return
+      }
 
-    const avgRating = vendorProducts.reduce((sum, p) => sum + p.rating, 0) / vendorProducts.length
-    const totalReviews = vendorProducts.reduce((sum, p) => sum + p.reviews, 0)
-    const categories = [...new Set(vendorProducts.map(p => p.category))]
-    const totalSales = Math.floor(Math.random() * 5000) + 1000
+      // Get store with stats
+      const storeWithStats = await getStoreWithStats(store.id)
+      setStoreData(storeWithStats)
 
-    return {
-      rating: Math.round(avgRating * 10) / 10,
-      totalReviews,
-      totalProducts: vendorProducts.length,
-      totalSales,
-      categories,
-      verified: true
+      // Get products and services
+      const { products: storeProducts, services: storeServices } = await getStoreProductsAndServices(store.id)
+      setProducts(storeProducts)
+      setServices(storeServices)
+    } catch (error) {
+      console.error("Error loading store data:", error)
+      setStoreData(null)
+    } finally {
+      setLoading(false)
     }
-  }, [vendorProducts])
+  }
+
+  // Combine products and services for filtering
+  const allItems = useMemo(() => {
+    let items: any[] = []
+    
+    if (selectedType === "all" || selectedType === "products") {
+      items = [...items, ...products.map(p => ({ ...p, type: "product" }))]
+    }
+    
+    if (selectedType === "all" || selectedType === "services") {
+      items = [...items, ...services.map(s => ({ ...s, type: "service" }))]
+    }
+    
+    return items
+  }, [products, services, selectedType])
 
   // Get unique categories
   const categories = useMemo(() => {
-    const cats = [...new Set(vendorProducts.map(p => p.category))]
+    const cats = [...new Set(allItems.map(item => item.category))]
     return [
       { name: "All Categories", value: "all" },
       ...cats.map(cat => ({ name: cat, value: cat }))
     ]
-  }, [vendorProducts])
+  }, [allItems])
 
-  // Filter products
-  const filteredProducts = useMemo(() => {
-    return vendorProducts.filter(product => {
+  // Filter items
+  const filteredItems = useMemo(() => {
+    return allItems.filter(item => {
       const matchesSearch = 
-        product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        product.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        product.description?.toLowerCase().includes(searchQuery.toLowerCase())
+        item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        item.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        item.description?.toLowerCase().includes(searchQuery.toLowerCase())
       
       const matchesCategory = 
-        selectedCategory === "all" || product.category === selectedCategory
+        selectedCategory === "all" || item.category === selectedCategory
       
       return matchesSearch && matchesCategory
     })
-  }, [vendorProducts, searchQuery, selectedCategory])
+  }, [allItems, searchQuery, selectedCategory])
 
-  const handleAddToCart = (product: Product) => {
+  const handleAddToCart = (item: any) => {
     const cartItem = {
-      ...product,
-      quantity: 1
+      id: item.id,
+      name: item.name,
+      price: `$${item.price}`,
+      image: item.image_url,
+      quantity: 1,
+      type: item.type,
+      vendor: storeData?.name || vendorName
     }
     const existingCart = JSON.parse(localStorage.getItem("cart") || "[]")
-    const existingItemIndex = existingCart.findIndex((item: Product & { quantity: number }) => item.id === product.id)
+    const existingItemIndex = existingCart.findIndex((cartItem: any) => 
+      cartItem.id === item.id && cartItem.type === item.type
+    )
     
     if (existingItemIndex >= 0) {
       existingCart[existingItemIndex].quantity += 1
@@ -83,20 +117,32 @@ export default function VendorStorePage({ vendorName }: VendorStorePageProps) {
     
     localStorage.setItem("cart", JSON.stringify(existingCart))
     window.dispatchEvent(new Event("cartUpdated"))
-    alert(`Added ${product.name} to cart!`)
+    alert(`Added ${item.name} to cart!`)
   }
 
-  const handleBuyNow = (product: Product) => {
-    handleAddToCart(product)
-    router.push(`/product/${product.id}`)
+  const handleBuyNow = (item: any) => {
+    handleAddToCart(item)
+    const path = item.type === "product" ? `/product/${item.id}` : `/service/${item.id}`
+    router.push(path)
   }
 
-  const handleGiftNow = (product: Product) => {
-    handleAddToCart(product)
-    router.push(`/send-gift?product=${encodeURIComponent(JSON.stringify(product))}`)
+  const handleGiftNow = (item: any) => {
+    handleAddToCart(item)
+    router.push("/send-gift")
   }
 
-  if (!vendorStats) {
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading store...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!storeData) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
         <Card className="border-2 border-gray-100">
@@ -135,21 +181,34 @@ export default function VendorStorePage({ vendorName }: VendorStorePageProps) {
           <CardContent className="p-6">
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
               <div className="flex items-center space-x-4">
-                <div className="w-16 h-16 rounded-lg bg-primary/10 flex items-center justify-center">
-                  <Store className="h-8 w-8 text-primary" />
-                </div>
+                {storeData.logo_url ? (
+                  <img
+                    src={storeData.logo_url}
+                    alt={storeData.name}
+                    className="w-16 h-16 rounded-lg object-cover"
+                  />
+                ) : (
+                  <div className="w-16 h-16 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <Store className="h-8 w-8 text-primary" />
+                  </div>
+                )}
                 <div>
                   <div className="flex items-center gap-3 mb-2">
-                    <h1 className="text-3xl font-bold text-gray-900">{vendorName}</h1>
-                    {vendorStats.verified && (
+                    <h1 className="text-3xl font-bold text-gray-900">{storeData.name}</h1>
+                    {storeData.stats.verified && (
                       <Badge className="bg-primary text-primary-foreground text-xs">
                         Verified
                       </Badge>
                     )}
                   </div>
                   <p className="text-gray-600">
-                    {vendorStats.categories.join(", ")} • {vendorStats.totalProducts} Products
+                    {storeData.category || "General"} • {storeData.stats.totalProducts} Items
                   </p>
+                  {storeData.description && (
+                    <p className="text-sm text-gray-500 mt-1 max-w-2xl">
+                      {storeData.description}
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -158,19 +217,19 @@ export default function VendorStorePage({ vendorName }: VendorStorePageProps) {
                 <div className="text-center">
                   <div className="flex items-center justify-center mb-1">
                     <Star className="h-5 w-5 fill-yellow-400 text-yellow-400 mr-1" />
-                    <span className="text-xl font-bold text-gray-900">{vendorStats.rating}</span>
+                    <span className="text-xl font-bold text-gray-900">{storeData.stats.rating || 0}</span>
                   </div>
-                  <p className="text-xs text-gray-600">{vendorStats.totalReviews} reviews</p>
+                  <p className="text-xs text-gray-600">{storeData.stats.totalReviews} reviews</p>
                 </div>
                 <div className="text-center">
                   <div className="text-xl font-bold text-gray-900 mb-1">
-                    {vendorStats.totalProducts}
+                    {storeData.stats.totalProducts}
                   </div>
-                  <p className="text-xs text-gray-600">Products</p>
+                  <p className="text-xs text-gray-600">Items</p>
                 </div>
                 <div className="text-center">
                   <div className="text-xl font-bold text-gray-900 mb-1">
-                    {vendorStats.totalSales}+
+                    {storeData.stats.totalSales}+
                   </div>
                   <p className="text-xs text-gray-600">Sales</p>
                 </div>
@@ -186,12 +245,52 @@ export default function VendorStorePage({ vendorName }: VendorStorePageProps) {
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-500" />
               <Input
                 type="text"
-                placeholder="Search products..."
+                placeholder="Search products and services..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10 pr-4 py-6 text-base bg-gray-50 border-2 border-gray-200 text-gray-900 placeholder:text-gray-500 focus:border-primary focus:bg-white"
               />
             </div>
+          </div>
+
+          {/* Type Filter */}
+          <div className="flex gap-2 mb-4">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setSelectedType("all")}
+              className={`${
+                selectedType === "all"
+                  ? "border-primary bg-primary text-white"
+                  : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+              }`}
+            >
+              All ({products.length + services.length})
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setSelectedType("products")}
+              className={`${
+                selectedType === "products"
+                  ? "border-primary bg-primary text-white"
+                  : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+              }`}
+            >
+              Products ({products.length})
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setSelectedType("services")}
+              className={`${
+                selectedType === "services"
+                  ? "border-primary bg-primary text-white"
+                  : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+              }`}
+            >
+              Services ({services.length})
+            </Button>
           </div>
 
           {/* Categories */}
@@ -217,98 +316,105 @@ export default function VendorStorePage({ vendorName }: VendorStorePageProps) {
         {/* Products Count */}
         <div className="mb-6">
           <p className="text-gray-600">
-            Showing <span className="font-semibold text-gray-900">{filteredProducts.length}</span> products
+            Showing <span className="font-semibold text-gray-900">{filteredItems.length}</span> {selectedType === "all" ? "items" : selectedType}
           </p>
         </div>
 
-        {/* Products Grid */}
-        {filteredProducts.length === 0 ? (
+        {/* Items Grid */}
+        {filteredItems.length === 0 ? (
           <Card className="border-2 border-gray-100">
             <CardContent className="p-12 text-center">
-              <p className="text-gray-600 text-lg mb-2">No products found</p>
+              <Package className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+              <p className="text-gray-600 text-lg mb-2">No items found</p>
               <p className="text-gray-500 text-sm">
-                Try adjusting your search or category filter
+                Try adjusting your search or filters
               </p>
             </CardContent>
           </Card>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {filteredProducts.map((product) => (
+            {filteredItems.map((item) => (
               <Card
-                key={product.id}
-                className="group hover:shadow-xl border-2 border-gray-100 hover:border-gray-200 transition-all duration-300 hover:-translate-y-2 overflow-hidden bg-white"
+                key={`${item.type}-${item.id}`}
+                className="group hover:shadow-xl border-2 border-gray-100 hover:border-gray-200 transition-all duration-300 overflow-hidden bg-white cursor-pointer"
+                onClick={() => {
+                  const path = item.type === "product" ? `/product/${item.id}` : `/service/${item.id}`
+                  router.push(path)
+                }}
               >
-                <div className="relative">
-                  <img
-                    src={product.image}
-                    alt={product.name}
-                    className="w-full h-48 object-cover group-hover:scale-110 transition-transform duration-300 cursor-pointer"
-                    onClick={() => router.push(`/product/${product.id}`)}
-                    loading="lazy"
-                    decoding="async"
-                  />
-                  <Badge className="absolute top-2 left-2 bg-secondary text-gray-900 font-semibold shadow-md">
-                    {product.discount}
+                <div className="relative aspect-square overflow-hidden bg-gray-100">
+                  {item.image_url ? (
+                    <img
+                      src={item.image_url}
+                      alt={item.name}
+                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-gray-200">
+                      <Package className="h-16 w-16 text-gray-400" />
+                    </div>
+                  )}
+                  {item.original_price && item.price < item.original_price && (
+                    <Badge className="absolute top-2 left-2 bg-red-500 text-white border-0">
+                      {Math.round(((item.original_price - item.price) / item.original_price) * 100)}% OFF
+                    </Badge>
+                  )}
+                  <Badge className="absolute top-2 right-2 bg-primary text-white border-0 text-xs">
+                    {item.type === "product" ? "Product" : "Service"}
                   </Badge>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="absolute top-2 right-2 bg-white/90 border-gray-200 text-gray-700 hover:bg-white opacity-0 group-hover:opacity-100 transition-opacity"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleGiftNow(product)
-                    }}
-                  >
-                    <Gift className="h-4 w-4" />
-                  </Button>
                 </div>
 
-                <CardContent className="p-5">
-                  <div className="flex items-start justify-between mb-3">
+                <CardContent className="p-4">
+                  <div className="flex items-start justify-between mb-2">
                     <Badge variant="outline" className="text-xs border-gray-200 bg-white text-gray-600">
-                      {product.category}
+                      {item.category}
                     </Badge>
                     <div className="flex items-center text-xs text-gray-600 font-medium">
                       <Star className="h-3.5 w-3.5 fill-current text-yellow-500 mr-1" />
-                      {product.rating} ({product.reviews})
+                      {item.rating || 0} ({item.reviews_count || 0})
                     </div>
                   </div>
 
-                  <h3
-                    className="font-bold text-base mb-2 line-clamp-2 text-gray-900 group-hover:text-primary transition-colors cursor-pointer"
-                    onClick={() => router.push(`/product/${product.id}`)}
-                  >
-                    {product.name}
+                  <h3 className="font-bold text-base mb-2 line-clamp-2 text-gray-900 group-hover:text-primary transition-colors">
+                    {item.name}
                   </h3>
 
-                  {product.description && (
+                  {item.description && (
                     <p className="text-xs text-gray-500 mb-3 line-clamp-2">
-                      {product.description}
+                      {item.description}
                     </p>
                   )}
 
                   <div className="flex items-center space-x-2 mb-4">
-                    <span className="font-bold text-lg text-primary">{product.price}</span>
-                    <span className="text-sm text-gray-500 line-through">
-                      {product.originalPrice}
-                    </span>
+                    <span className="font-bold text-lg text-primary">${item.price}</span>
+                    {item.original_price && item.price < item.original_price && (
+                      <span className="text-sm text-gray-500 line-through">
+                        ${item.original_price}
+                      </span>
+                    )}
                   </div>
 
                   <div className="flex gap-2">
                     <Button
                       size="sm"
                       variant="outline"
-                      className="flex-1 border-2 border-gray-300 bg-white text-gray-700 hover:bg-red-600 hover:text-white hover:border-red-600 font-medium"
-                      onClick={() => handleGiftNow(product)}
+                      className="flex-1 border-2 border-gray-300 bg-white text-gray-700 hover:bg-primary hover:text-white hover:border-primary font-medium"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleGiftNow(item)
+                      }}
                     >
                       <Gift className="h-4 w-4 mr-1" />
-                      Send Gift
+                      Gift
                     </Button>
                     <Button
                       size="sm"
                       variant="outline"
                       className="border-gray-200 bg-white text-gray-600 hover:bg-gray-50 hover:border-gray-300"
-                      onClick={() => handleAddToCart(product)}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleAddToCart(item)
+                      }}
                     >
                       <ShoppingCart className="h-4 w-4" />
                     </Button>

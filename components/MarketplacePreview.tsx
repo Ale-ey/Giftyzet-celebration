@@ -20,6 +20,10 @@ export default function MarketplacePreview() {
   const loadProducts = async () => {
     try {
       const data = await getApprovedProducts(8) // Load 8 featured products
+      console.log("MarketplacePreview products:", data)
+      if (data && data.length > 0) {
+        console.log("First product stores:", data[0].stores)
+      }
       setProducts(data || [])
     } catch (error) {
       console.error("Error loading products:", error)
@@ -43,7 +47,7 @@ export default function MarketplacePreview() {
       image: product.image_url,
       quantity: 1,
       type: "product",
-      vendor: product.stores?.vendors?.vendor_name || "Unknown Vendor"
+      vendor: product.stores?.vendors?.vendor_name || product.stores?.name || "Unknown Vendor"
     }
     const existingCart = JSON.parse(localStorage.getItem("cart") || "[]")
     const existingItemIndex = existingCart.findIndex((item: any) => item.id === product.id && item.type === "product")
@@ -69,7 +73,7 @@ export default function MarketplacePreview() {
       image: product.image_url,
       quantity: 1,
       type: "product",
-      vendor: product.stores?.vendors?.vendor_name || "Unknown Vendor"
+      vendor: product.stores?.vendors?.vendor_name || product.stores?.name || "Unknown Vendor"
     }
     const existingCart = JSON.parse(localStorage.getItem("cart") || "[]")
     const existingItemIndex = existingCart.findIndex((item: any) => item.id === product.id && item.type === "product")
@@ -175,7 +179,7 @@ export default function MarketplacePreview() {
                         {product.name}
                       </h3>
                       <p className="text-xs text-gray-500">
-                        by {product.stores?.vendors?.vendor_name || "Unknown"}
+                        by {product.stores?.vendors?.vendor_name || product.stores?.name || "Unknown"}
                       </p>
                     </div>
                     

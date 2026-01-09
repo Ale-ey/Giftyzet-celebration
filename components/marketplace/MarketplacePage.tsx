@@ -31,6 +31,10 @@ export default function MarketplacePage() {
     try {
       setLoading(true)
       const data = await getApprovedProducts()
+      console.log("Products data:", data)
+      if (data && data.length > 0) {
+        console.log("First product stores:", data[0].stores)
+      }
       setProducts(data || [])
     } catch (error) {
       console.error("Error loading products:", error)
@@ -63,7 +67,7 @@ export default function MarketplacePage() {
       image: product.image_url,
       quantity: 1,
       type: "product",
-      vendor: product.stores?.vendors?.vendor_name || "Unknown Vendor"
+      vendor: product.stores?.vendors?.vendor_name || product.stores?.name || "Unknown Vendor"
     }
     const existingCart = JSON.parse(localStorage.getItem("cart") || "[]")
     const existingItemIndex = existingCart.findIndex((item: any) => item.id === product.id && item.type === "product")
@@ -208,7 +212,7 @@ export default function MarketplacePage() {
                             {product.name}
                           </h3>
                           <p className="text-xs text-gray-500">
-                            by {product.stores?.vendors?.vendor_name || "Unknown Vendor"}
+                            by {product.stores?.vendors?.vendor_name || product.stores?.name || "Unknown Vendor"}
                           </p>
                         </div>
                         

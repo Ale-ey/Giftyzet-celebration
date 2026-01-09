@@ -382,3 +382,130 @@ export async function getStoreById(storeId: string) {
   return data
 }
 
+// ============================================
+// PUBLIC STORE FUNCTIONS
+// ============================================
+
+// Get store by name (for public store page)
+export async function getStoreByName(storeName: string) {
+  const { data, error } = await supabase
+    .from('stores')
+    .select(`
+      *,
+      vendors (
+        id,
+        vendor_name,
+        business_name
+      )
+    `)
+    .eq('status', 'approved')
+    .ilike('name', storeName)
+    .single()
+
+  if (error) throw error
+  return data
+}
+
+// Get store with stats by store ID
+export async function getStoreWithStats(storeId: string) {
+  // Get store details
+  const { data: store, error: storeError } = await supabase
+    .from('stores')
+    .select(`
+      *,
+      vendors (
+        id,
+        vendor_name,
+        business_name
+      )
+    `)
+    .eq('id', storeId)
+    .eq('status', 'approved')
+    .single()
+
+  if (storeError) throw storeError
+
+  // Get product count
+  const { count: productCount } = await supabase
+    .from('products')
+    .select('*', { count: 'exact', head: true })
+    .eq('store_id', storeId)
+    .eq('available', true)
+
+  // Get service count
+  const { count: serviceCount } = await supabase
+    .from('services')
+    .select('*', { count: 'exact', head: true })
+    .eq('store_id', storeId)
+    .eq('available', true)
+
+  // Get products for rating calculation
+  const { data: products } = await supabase
+    .from('products')
+    .select('rating, reviews_count')
+    .eq('store_id', storeId)
+    .eq('available', true)
+
+  // Get services for rating calculation
+  const { data: services } = await supabase
+    .from('services')
+    .select('rating, reviews_count')
+    .eq('store_id', storeId)
+    .eq('available', true)
+
+  // Calculate average rating and total reviews
+  const allItems = [...(products || []), ...(services || [])]
+  const totalReviews = allItems.reduce((sum, item) => sum + (item.reviews_count || 0), 0)
+  const avgRating = allItems.length > 0
+    ? allItems.reduce((sum, item) => sum + (item.rating || 0), 0) / allItems.length
+    : 0
+
+  // Get completed orders count
+  const { count: ordersCount } = await supabase
+    .from('vendor_orders')
+    .select('*', { count: 'exact', head: true })
+    .eq('store_id', storeId)
+    .eq('status', 'completed')
+
+  return {
+    ...store,
+    stats: {
+      rating: Math.round(avgRating * 10) / 10,
+      totalReviews,
+      totalProducts: (productCount || 0) + (serviceCount || 0),
+      totalSales: ordersCount || 0,
+      productCount: productCount || 0,
+      serviceCount: serviceCount || 0,
+      verified: true
+    }
+  }
+}
+
+// Get products and services by store ID
+export async function getStoreProductsAndServices(storeId: string) {
+  // Get products
+  const { data: products, error: productsError } = await supabase
+    .from('products')
+    .select('*')
+    .eq('store_id', storeId)
+    .eq('available', true)
+    .order('created_at', { ascending: false })
+
+  if (productsError) throw productsError
+
+  // Get services
+  const { data: services, error: servicesError } = await supabase
+    .from('services')
+    .select('*')
+    .eq('store_id', storeId)
+    .eq('available', true)
+    .order('created_at', { ascending: false })
+
+  if (servicesError) throw servicesError
+
+  return {
+    products: products || [],
+    services: services || []
+  }
+}
+

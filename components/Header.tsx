@@ -241,6 +241,12 @@ export default function Header() {
                       Vendor Dashboard
                     </DropdownMenuItem>
                   )}
+                  {userRole === "admin" && (
+                    <DropdownMenuItem onClick={() => router.push("/admin")} className="cursor-pointer text-black">
+                      <Settings className="h-4 w-4 mr-2" />
+                      Admin Dashboard
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuItem 
                     onClick={handleSignOutClick}
                     disabled={signingOut}

@@ -61,6 +61,11 @@ export const getApprovedStores = (): Store[] => {
   return stores.filter((s) => s.status === "approved")
 }
 
+export const getSuspendedStores = (): Store[] => {
+  const stores = getStores()
+  return stores.filter((s) => s.status === "suspended")
+}
+
 // Order data management
 export const getOrders = (): Order[] => {
   if (typeof window === "undefined") return []

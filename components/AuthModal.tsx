@@ -52,11 +52,14 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
           onClose()
           resetForm()
           
-          // Check if user is vendor and redirect accordingly
+          // Check user role and redirect accordingly
           const { getCurrentUserWithProfile } = await import("@/lib/api/auth")
           try {
             const userProfile = await getCurrentUserWithProfile()
-            if (userProfile?.role === "vendor") {
+            if (userProfile?.role === "admin") {
+              // Redirect admin to admin dashboard
+              router.push("/admin")
+            } else if (userProfile?.role === "vendor") {
               // Check store status for vendors
               const { getVendorByUserId, getStoreByVendorId } = await import("@/lib/api/vendors")
               const vendor = await getVendorByUserId(user.id)

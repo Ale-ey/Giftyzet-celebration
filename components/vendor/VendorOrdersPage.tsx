@@ -37,6 +37,15 @@ export default function VendorOrdersPage() {
           const vendors = getVendors()
           vendor = vendors.find((v: any) => v.email === auth.email || v.vendorName === auth.vendorName)
           
+          // Check if store is suspended
+          if (vendor) {
+            const vendorStore = getStoreByVendorId(vendor.id)
+            if (vendorStore?.status === "suspended") {
+              router.push("/vendor")
+              return
+            }
+          }
+          
           if (!vendor && auth.vendorName) {
             const vendorId = `vendor-${Date.now()}`
             vendor = {

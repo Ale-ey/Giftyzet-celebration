@@ -7,10 +7,12 @@ import {
   Package, 
   ShoppingBag, 
   Settings,
-  DollarSign
+  DollarSign,
+  AlertTriangle
 } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { getCurrentUser } from "@/lib/api/auth"
 import { getVendorByUserId, getStoreByVendorId } from "@/lib/api/vendors"
 import { getOrdersByVendorId } from "@/lib/api/orders"
@@ -23,6 +25,7 @@ export default function VendorDashboard() {
   const [totalRevenue, setTotalRevenue] = useState(0)
   const [monthlyRevenue, setMonthlyRevenue] = useState(0)
   const [totalOrders, setTotalOrders] = useState(0)
+  const [isSuspended, setIsSuspended] = useState(false)
 
   useEffect(() => {
     loadDashboardData()
@@ -51,9 +54,18 @@ export default function VendorDashboard() {
         return
       }
 
+      // If store is suspended, show dialog
+      if (vendorStore.status === "suspended") {
+        setStore(vendorStore)
+        setIsSuspended(true)
+        setLoading(false)
+        return
+      }
+
       // If store is approved, load dashboard data
       if (vendorStore.status === "approved") {
         setStore(vendorStore)
+        setIsSuspended(false)
         
         // Load orders
         try {
@@ -113,6 +125,49 @@ export default function VendorDashboard() {
 
   if (!store) {
     return null // Will redirect to registration
+  }
+
+  // If store is suspended, show suspension dialog
+  if (isSuspended) {
+    return (
+      <>
+        <div className="min-h-screen bg-white flex items-center justify-center p-4">
+          <Card className="max-w-md w-full border-2 border-red-300 bg-red-50">
+            <CardHeader>
+              <div className="flex items-center gap-3 mb-2">
+                <div className="bg-red-100 p-3 rounded-full">
+                  <AlertTriangle className="h-8 w-8 text-red-600" />
+                </div>
+                <CardTitle className="text-2xl text-gray-900">Store Suspended</CardTitle>
+              </div>
+              <CardDescription className="text-gray-700 text-base">
+                Your store has been suspended due to suspicious activity.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-gray-700">
+                Please contact our support team for more information and to resolve this issue.
+              </p>
+              <div className="bg-white p-4 rounded-lg border border-red-200">
+                <p className="text-sm text-gray-600 mb-1">Contact Support:</p>
+                <a 
+                  href="mailto:help@giftyzel.com" 
+                  className="text-primary font-semibold hover:underline"
+                >
+                  help@giftyzel.com
+                </a>
+              </div>
+              <Button
+                onClick={() => router.push("/")}
+                className="w-full bg-primary hover:bg-primary/90 text-white"
+              >
+                Go to Homepage
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </>
+    )
   }
 
   const pendingOrders = orders.filter((o: any) => o.status === "pending").length

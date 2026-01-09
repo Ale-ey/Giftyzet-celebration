@@ -126,3 +126,170 @@ export async function getTopVendors(limit: number = 10) {
   return data
 }
 
+// ============================================
+// ADMIN FUNCTIONS
+// ============================================
+
+// Get all pending stores (admin only)
+export async function getPendingStores() {
+  const { data, error } = await supabase
+    .from('stores')
+    .select(`
+      *,
+      vendors (
+        id,
+        vendor_name,
+        business_name,
+        email,
+        phone,
+        address,
+        city,
+        state
+      )
+    `)
+    .eq('status', 'pending')
+    .order('created_at', { ascending: false })
+
+  if (error) throw error
+  return data
+}
+
+// Get all approved stores (admin only)
+export async function getAllApprovedStores() {
+  const { data, error } = await supabase
+    .from('stores')
+    .select(`
+      *,
+      vendors (
+        id,
+        vendor_name,
+        business_name,
+        email,
+        phone
+      )
+    `)
+    .eq('status', 'approved')
+    .order('created_at', { ascending: false })
+
+  if (error) throw error
+  return data
+}
+
+// Get all suspended stores (admin only)
+export async function getSuspendedStores() {
+  const { data, error } = await supabase
+    .from('stores')
+    .select(`
+      *,
+      vendors (
+        id,
+        vendor_name,
+        business_name,
+        email,
+        phone
+      )
+    `)
+    .eq('status', 'suspended')
+    .order('suspended_at', { ascending: false })
+
+  if (error) throw error
+  return data
+}
+
+// Get all stores (admin only)
+export async function getAllStores() {
+  const { data, error } = await supabase
+    .from('stores')
+    .select(`
+      *,
+      vendors (
+        id,
+        vendor_name,
+        business_name,
+        email,
+        phone
+      )
+    `)
+    .order('created_at', { ascending: false })
+
+  if (error) throw error
+  return data
+}
+
+// Approve store (admin only)
+export async function approveStore(storeId: string, adminUserId: string) {
+  const { data, error } = await supabase
+    .from('stores')
+    .update({
+      status: 'approved',
+      approved_at: new Date().toISOString(),
+      approved_by: adminUserId,
+      suspended_at: null
+    })
+    .eq('id', storeId)
+    .select()
+    .single()
+
+  if (error) throw error
+  return data
+}
+
+// Suspend store (admin only)
+export async function suspendStore(storeId: string) {
+  const { data, error } = await supabase
+    .from('stores')
+    .update({
+      status: 'suspended',
+      suspended_at: new Date().toISOString()
+    })
+    .eq('id', storeId)
+    .select()
+    .single()
+
+  if (error) throw error
+  return data
+}
+
+// Reject store (admin only)
+export async function rejectStore(storeId: string) {
+  const { data, error } = await supabase
+    .from('stores')
+    .update({
+      status: 'rejected',
+      suspended_at: new Date().toISOString()
+    })
+    .eq('id', storeId)
+    .select()
+    .single()
+
+  if (error) throw error
+  return data
+}
+
+// Get store by ID (admin)
+export async function getStoreById(storeId: string) {
+  const { data, error } = await supabase
+    .from('stores')
+    .select(`
+      *,
+      vendors (
+        id,
+        vendor_name,
+        business_name,
+        business_type,
+        email,
+        phone,
+        address,
+        city,
+        state,
+        zip_code,
+        country
+      )
+    `)
+    .eq('id', storeId)
+    .single()
+
+  if (error) throw error
+  return data
+}
+

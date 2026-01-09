@@ -47,6 +47,15 @@ export default function VendorProductsPage() {
           const vendors = getVendors()
           vendor = vendors.find((v) => v.email === auth.email || v.vendorName === auth.vendorName)
           
+          // Check if store is suspended
+          if (vendor) {
+            const vendorStore = getStoreByVendorId(vendor.id)
+            if (vendorStore?.status === "suspended") {
+              router.push("/vendor")
+              return
+            }
+          }
+          
           // If vendor doesn't exist in vendors list, create it
           if (!vendor && auth.vendorName) {
             const { saveVendor, saveStore } = require("@/lib/vendor-data")

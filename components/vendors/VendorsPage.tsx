@@ -1,24 +1,26 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Search, Star, Store, Award, TrendingUp, Users, ShoppingBag } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { allProducts } from "@/lib/constants"
-import type { Product } from "@/types"
+import { getTopVendorsByRating } from "@/lib/api/vendors"
+import { getProductsByStore, getServicesByStore } from "@/lib/api/products"
 
 interface Vendor {
+  id: string
   name: string
+  vendor_name: string
   category: string
   rating: number
   totalReviews: number
   totalProducts: number
   totalSales: number
   verified: boolean
-  logo?: string
+  logo_url?: string
   description: string
   joinDate: string
 }
@@ -27,63 +29,55 @@ export default function VendorsPage() {
   const router = useRouter()
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedCategory, setSelectedCategory] = useState("all")
+  const [vendorsData, setVendorsData] = useState<Vendor[]>([])
+  const [loading, setLoading] = useState(true)
+  const [storeProducts, setStoreProducts] = useState<Record<string, any[]>>({})
 
-  // Extract unique vendors from products
-  const vendorsData = useMemo(() => {
-    const vendorMap = new Map<string, {
-      products: Product[]
-      totalSales: number
-    }>()
+  // Fetch vendors from API
+  useEffect(() => {
+    async function fetchVendors() {
+      try {
+        setLoading(true)
+        const data = await getTopVendorsByRating()
+        setVendorsData(data)
 
-    allProducts.forEach(product => {
-      if (!vendorMap.has(product.vendor)) {
-        vendorMap.set(product.vendor, {
-          products: [],
-          totalSales: Math.floor(Math.random() * 5000) + 1000 // Random sales for demo
-        })
+        // Fetch products for each store
+        const productsMap: Record<string, any[]> = {}
+        for (const vendor of data.slice(0, 10)) { // Fetch products only for first 10 vendors
+          try {
+            const products = await getProductsByStore(vendor.id)
+            const services = await getServicesByStore(vendor.id)
+            productsMap[vendor.id] = [...products.slice(0, 3), ...services.slice(0, 3)].slice(0, 3)
+          } catch (err) {
+            console.error(`Error fetching products for store ${vendor.id}:`, err)
+            productsMap[vendor.id] = []
+          }
+        }
+        setStoreProducts(productsMap)
+      } catch (error) {
+        console.error('Error fetching vendors:', error)
+      } finally {
+        setLoading(false)
       }
-      vendorMap.get(product.vendor)!.products.push(product)
-    })
+    }
 
-    const vendors: Vendor[] = Array.from(vendorMap.entries()).map(([name, data]) => {
-      const avgRating = data.products.reduce((sum, p) => sum + p.rating, 0) / data.products.length
-      const totalReviews = data.products.reduce((sum, p) => sum + p.reviews, 0)
-      const categories = [...new Set(data.products.map(p => p.category))]
-      
-      return {
-        name,
-        category: categories[0] || "General",
-        rating: Math.round(avgRating * 10) / 10,
-        totalReviews,
-        totalProducts: data.products.length,
-        totalSales: data.totalSales,
-        verified: true,
-        description: `Leading ${categories[0] || "general"} vendor with ${data.products.length} quality products`,
-        joinDate: "2023-01-15"
-      }
-    })
-
-    // Sort by rating and total sales
-    return vendors.sort((a, b) => {
-      const scoreA = a.rating * 1000 + a.totalSales
-      const scoreB = b.rating * 1000 + b.totalSales
-      return scoreB - scoreA
-    })
+    fetchVendors()
   }, [])
 
-  const categories = [
+  const categories = useMemo(() => [
     { name: "All Categories", value: "all" },
     ...Array.from(new Set(vendorsData.map(v => v.category))).map(cat => ({
       name: cat,
       value: cat
     }))
-  ]
+  ], [vendorsData])
 
   const filteredVendors = useMemo(() => {
     return vendorsData.filter(vendor => {
       const matchesSearch = 
         vendor.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        vendor.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        vendor.vendor_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (vendor.description && vendor.description.toLowerCase().includes(searchQuery.toLowerCase())) ||
         vendor.category.toLowerCase().includes(searchQuery.toLowerCase())
       
       const matchesCategory = 
@@ -93,12 +87,16 @@ export default function VendorsPage() {
     })
   }, [vendorsData, searchQuery, selectedCategory])
 
-  const handleVendorClick = (vendorName: string) => {
-    router.push(`/vendors/${encodeURIComponent(vendorName)}`)
+  const handleVendorClick = (storeId: string) => {
+    router.push(`/store/${storeId}`)
   }
 
-  const handleProductClick = (productId: number) => {
-    router.push(`/product/${productId}`)
+  const handleProductClick = (productId: string, type: string) => {
+    if (type === 'service') {
+      router.push(`/service/${productId}`)
+    } else {
+      router.push(`/product/${productId}`)
+    }
   }
 
   return (
@@ -146,8 +144,14 @@ export default function VendorsPage() {
         </div>
 
         {/* Vendors Grid */}
-        {filteredVendors.length === 0 ? (
-          <Card className="border-2 border-gray-100">
+        {loading ? (
+          <Card className="border-2 border-gray-100 bg-white">
+            <CardContent className="p-12 text-center">
+              <p className="text-gray-600 text-lg">Loading vendors...</p>
+            </CardContent>
+          </Card>
+        ) : filteredVendors.length === 0 ? (
+          <Card className="border-2 border-gray-100 bg-white">
             <CardContent className="p-12 text-center">
               <Store className="h-16 w-16 text-gray-300 mx-auto mb-4" />
               <p className="text-gray-600 text-lg mb-2">No vendors found</p>
@@ -159,18 +163,28 @@ export default function VendorsPage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredVendors.map((vendor) => {
-              const vendorProducts = allProducts.filter(p => p.vendor === vendor.name).slice(0, 3)
+              const vendorProducts = storeProducts[vendor.id] || []
               return (
                 <Card
-                  key={vendor.name}
+                  key={vendor.id}
                   className="border-2 border-gray-100 hover:border-gray-200 bg-white transition-all hover:shadow-lg"
                 >
                   <CardHeader>
                     <div className="flex items-start justify-between mb-4">
                       <div className="flex items-center space-x-3">
-                        <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
-                          <Store className="h-6 w-6 text-primary" />
-                        </div>
+                        {vendor.logo_url ? (
+                          <div className="w-12 h-12 rounded-lg overflow-hidden border border-gray-200">
+                            <img 
+                              src={vendor.logo_url} 
+                              alt={vendor.name}
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                        ) : (
+                          <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
+                            <Store className="h-6 w-6 text-primary" />
+                          </div>
+                        )}
                         <div>
                           <CardTitle className="text-gray-900 flex items-center gap-2">
                             {vendor.name}
@@ -190,7 +204,9 @@ export default function VendorsPage() {
                       <div className="text-center p-2 bg-gray-50 rounded">
                         <div className="flex items-center justify-center mb-1">
                           <Star className="h-4 w-4 fill-yellow-400 text-yellow-400 mr-1" />
-                          <span className="font-semibold text-sm text-gray-900">{vendor.rating}</span>
+                          <span className="font-semibold text-sm text-gray-900">
+                            {vendor.rating > 0 ? vendor.rating.toFixed(1) : 'N/A'}
+                          </span>
                         </div>
                         <p className="text-xs text-gray-600">Rating</p>
                       </div>
@@ -202,15 +218,17 @@ export default function VendorsPage() {
                       </div>
                       <div className="text-center p-2 bg-gray-50 rounded">
                         <div className="font-semibold text-sm text-gray-900 mb-1">
-                          {vendor.totalSales}+
+                          {vendor.totalSales}
                         </div>
-                        <p className="text-xs text-gray-600">Sales</p>
+                        <p className="text-xs text-gray-600">Orders</p>
                       </div>
                     </div>
 
-                    <p className="text-sm text-gray-600 mb-4 line-clamp-2">
-                      {vendor.description}
-                    </p>
+                    {vendor.description && (
+                      <p className="text-sm text-gray-600 mb-4 line-clamp-2">
+                        {vendor.description}
+                      </p>
+                    )}
                   </CardHeader>
 
                   <CardContent>
@@ -222,17 +240,25 @@ export default function VendorsPage() {
                           {vendorProducts.map((product) => (
                             <div
                               key={product.id}
-                              className="relative aspect-square rounded-lg overflow-hidden border border-gray-200 cursor-pointer hover:border-gray-300 transition-colors"
-                              onClick={() => handleProductClick(product.id)}
+                              className="relative aspect-square rounded-lg overflow-hidden border border-gray-200 cursor-pointer hover:border-gray-300 transition-colors bg-gray-50"
+                              onClick={() => handleProductClick(product.id, product.duration ? 'service' : 'product')}
                             >
-                              <img
-                                src={product.image}
-                                alt={product.name}
-                                className="w-full h-full object-cover"
-                              />
-                              <Badge className="absolute top-1 left-1 bg-secondary text-gray-900 text-xs">
-                                {product.discount}
-                              </Badge>
+                              {product.image_url ? (
+                                <img
+                                  src={product.image_url}
+                                  alt={product.name}
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center text-gray-400">
+                                  No image
+                                </div>
+                              )}
+                              {product.original_price && product.original_price > product.price && (
+                                <Badge className="absolute top-1 left-1 bg-red-500 text-white text-xs">
+                                  {Math.round((1 - product.price / product.original_price) * 100)}% OFF
+                                </Badge>
+                              )}
                             </div>
                           ))}
                         </div>
@@ -244,7 +270,7 @@ export default function VendorsPage() {
                       <Button
                         variant="outline"
                         className="flex-1 border-2 border-gray-300 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-400 font-medium"
-                        onClick={() => handleVendorClick(vendor.name)}
+                        onClick={() => handleVendorClick(vendor.id)}
                       >
                         View Store
                       </Button>
@@ -252,7 +278,7 @@ export default function VendorsPage() {
                         variant="outline"
                         size="sm"
                         className="border-gray-200 bg-white text-gray-600 hover:bg-gray-50 hover:border-gray-300"
-                        onClick={() => router.push(`/marketplace?vendor=${encodeURIComponent(vendor.name)}`)}
+                        onClick={() => router.push(`/marketplace?store=${vendor.id}`)}
                       >
                         <ShoppingBag className="h-4 w-4" />
                       </Button>

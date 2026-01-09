@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { X, Upload, Trash2 } from "lucide-react"
+import { X, Upload } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -13,28 +13,30 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { STORE_CATEGORIES } from "@/lib/constants"
-import type { Product } from "@/types"
+import { createProduct, updateProduct } from "@/lib/api/products"
 
 interface AddProductDialogProps {
   isOpen: boolean
   onClose: () => void
-  onSave: (product: Omit<Product, "id" | "rating" | "reviews" | "vendor">) => void
-  editProduct?: Product | null
+  onSave: () => void
+  editProduct?: any | null
+  storeId?: string
 }
 
-export default function AddProductDialog({ isOpen, onClose, onSave, editProduct }: AddProductDialogProps) {
+export default function AddProductDialog({ isOpen, onClose, onSave, editProduct, storeId }: AddProductDialogProps) {
   const [formData, setFormData] = useState({
     name: "",
     description: "",
     price: "",
-    originalPrice: "",
+    original_price: "",
     category: "",
-    discount: "",
     stock: "",
     available: true
   })
-  const [images, setImages] = useState<string[]>([])
-  const fileInputRefs = useRef<(HTMLInputElement | null)[]>([])
+  const [imageFiles, setImageFiles] = useState<(File | null)[]>([null, null, null, null])
+  const [imagePreviews, setImagePreviews] = useState<(string | null)[]>([null, null, null, null])
+  const [loading, setLoading] = useState(false)
+  const fileInputRefs = useRef<(HTMLInputElement | null)[]>([null, null, null, null])
 
   // Load product data when editing
   useEffect(() => {
@@ -42,32 +44,47 @@ export default function AddProductDialog({ isOpen, onClose, onSave, editProduct 
       setFormData({
         name: editProduct.name || "",
         description: editProduct.description || "",
-        price: editProduct.price.replace("$", "") || "",
-        originalPrice: editProduct.originalPrice.replace("$", "") || "",
+        price: editProduct.price?.toString() || "",
+        original_price: editProduct.original_price?.toString() || "",
         category: editProduct.category || "",
-        discount: editProduct.discount || "",
         stock: editProduct.stock?.toString() || "",
         available: editProduct.available !== false
       })
-      setImages(editProduct.image ? [editProduct.image] : [])
+      
+      // Load existing images
+      if (editProduct.images && Array.isArray(editProduct.images)) {
+        const previews = [...imagePreviews]
+        editProduct.images.forEach((url: string, index: number) => {
+          if (index < 4) previews[index] = url
+        })
+        setImagePreviews(previews)
+      } else if (editProduct.image_url) {
+        setImagePreviews([editProduct.image_url, null, null, null])
+      }
+      
+      setImageFiles([null, null, null, null])
     } else if (!editProduct && isOpen) {
       // Reset form when adding new product
-      setFormData({
-        name: "",
-        description: "",
-        price: "",
-        originalPrice: "",
-        category: "",
-        discount: "",
-        stock: "",
-        available: true
-      })
-      setImages([])
-      fileInputRefs.current.forEach(ref => {
-        if (ref) ref.value = ""
-      })
+      resetForm()
     }
   }, [editProduct, isOpen])
+
+  const resetForm = () => {
+    setFormData({
+      name: "",
+      description: "",
+      price: "",
+      original_price: "",
+      category: "",
+      stock: "",
+      available: true
+    })
+    setImageFiles([null, null, null, null])
+    setImagePreviews([null, null, null, null])
+    fileInputRefs.current.forEach(ref => {
+      if (ref) ref.value = ""
+    })
+  }
 
   const handleImageUpload = (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -83,25 +100,35 @@ export default function AddProductDialog({ isOpen, onClose, onSave, editProduct 
       return
     }
 
+    const newFiles = [...imageFiles]
+    newFiles[index] = file
+    setImageFiles(newFiles)
+    
+    // Create preview
     const reader = new FileReader()
     reader.onloadend = () => {
-      const base64String = reader.result as string
-      const newImages = [...images]
-      newImages[index] = base64String
-      setImages(newImages)
+      const newPreviews = [...imagePreviews]
+      newPreviews[index] = reader.result as string
+      setImagePreviews(newPreviews)
     }
     reader.readAsDataURL(file)
   }
 
   const removeImage = (index: number) => {
-    const newImages = images.filter((_, i) => i !== index)
-    setImages(newImages)
+    const newFiles = [...imageFiles]
+    newFiles[index] = null
+    setImageFiles(newFiles)
+    
+    const newPreviews = [...imagePreviews]
+    newPreviews[index] = null
+    setImagePreviews(newPreviews)
+    
     if (fileInputRefs.current[index]) {
       fileInputRefs.current[index]!.value = ""
     }
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
     if (!formData.name || !formData.price || !formData.category) {
@@ -109,62 +136,67 @@ export default function AddProductDialog({ isOpen, onClose, onSave, editProduct 
       return
     }
 
-    if (images.length === 0 && !editProduct) {
-      alert("Please upload at least one image")
+    // Check if at least one image is provided
+    const hasImage = imagePreviews.some(preview => preview !== null)
+    if (!hasImage && !editProduct) {
+      alert("Please upload at least one product image")
       return
     }
 
-    // Calculate discount percentage if both prices are provided
-    let discount = formData.discount
-    if (formData.originalPrice && formData.price) {
-      const original = parseFloat(formData.originalPrice.replace("$", ""))
-      const sale = parseFloat(formData.price.replace("$", ""))
-      if (original > sale) {
-        const discountPercent = Math.round(((original - sale) / original) * 100)
-        discount = `${discountPercent}% OFF`
-      }
+    if (!storeId) {
+      alert("Store ID is missing")
+      return
     }
 
-    onSave({
-      name: formData.name,
-      description: formData.description,
-      price: formData.price.startsWith("$") ? formData.price : `$${formData.price}`,
-      originalPrice: formData.originalPrice || formData.price,
-      category: formData.category,
-      image: images[0], // Use first image as main image
-      discount: discount || "",
-      description: formData.description,
-      stock: formData.stock ? parseInt(formData.stock) : undefined,
-      available: formData.available
-    })
+    setLoading(true)
 
-    // Reset form
-    setFormData({
-      name: "",
-      description: "",
-      price: "",
-      originalPrice: "",
-      category: "",
-      discount: "",
-      stock: "",
-      available: true
-    })
-    setImages([])
-    fileInputRefs.current.forEach(ref => {
-      if (ref) ref.value = ""
-    })
-    onClose()
+    try {
+      const productData = {
+        name: formData.name,
+        description: formData.description,
+        price: parseFloat(formData.price),
+        original_price: formData.original_price ? parseFloat(formData.original_price) : parseFloat(formData.price),
+        category: formData.category,
+        stock: formData.stock ? parseInt(formData.stock) : 0,
+        available: formData.available
+      }
+
+      // Get only the files that were uploaded (not null)
+      const filesToUpload = imageFiles.filter((file): file is File => file !== null)
+
+      if (editProduct) {
+        // Update existing product - only upload new files
+        if (filesToUpload.length > 0) {
+          await updateProduct(editProduct.id, productData, filesToUpload, storeId)
+        } else {
+          // No new images, just update data
+          await updateProduct(editProduct.id, productData, undefined, storeId)
+        }
+      } else {
+        // Create new product
+        await createProduct(storeId, productData, filesToUpload)
+      }
+
+      resetForm()
+      onSave() // Reload products
+      onClose()
+    } catch (error: any) {
+      console.error("Error saving product:", error)
+      alert(`Failed to save product: ${error.message || "Please try again."}`)
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-2xl bg-white max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-3xl bg-white max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold text-gray-900">
             {editProduct ? "Edit Product" : "Add New Product"}
           </DialogTitle>
           <DialogDescription className="text-gray-600">
-            {editProduct ? "Update the product details and images" : "Fill in the product details and upload images"}
+            {editProduct ? "Update the product details and images" : "Fill in the product details and upload images (up to 4)"}
           </DialogDescription>
         </DialogHeader>
 
@@ -204,26 +236,30 @@ export default function AddProductDialog({ isOpen, onClose, onSave, editProduct 
               </label>
               <Input
                 id="price"
-                type="text"
+                type="number"
+                step="0.01"
+                min="0"
                 value={formData.price}
                 onChange={(e) => setFormData({ ...formData, price: e.target.value })}
                 required
                 className="bg-white border-gray-200 text-gray-900"
-                placeholder="$99.99"
+                placeholder="99.99"
               />
             </div>
 
             <div className="space-y-2">
-              <label htmlFor="originalPrice" className="text-sm font-semibold text-gray-900">
+              <label htmlFor="original_price" className="text-sm font-semibold text-gray-900">
                 Original Price
               </label>
               <Input
-                id="originalPrice"
-                type="text"
-                value={formData.originalPrice}
-                onChange={(e) => setFormData({ ...formData, originalPrice: e.target.value })}
+                id="original_price"
+                type="number"
+                step="0.01"
+                min="0"
+                value={formData.original_price}
+                onChange={(e) => setFormData({ ...formData, original_price: e.target.value })}
                 className="bg-white border-gray-200 text-gray-900"
-                placeholder="$129.99"
+                placeholder="129.99"
               />
             </div>
           </div>
@@ -279,15 +315,15 @@ export default function AddProductDialog({ isOpen, onClose, onSave, editProduct 
 
           <div className="space-y-2">
             <label className="text-sm font-semibold text-gray-900">
-              Product Images * (Upload up to 5 images)
+              Product Images * (Upload up to 4 images)
             </label>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-              {[0, 1, 2, 3, 4].map((index) => (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {[0, 1, 2, 3].map((index) => (
                 <div key={index} className="relative">
-                  {images[index] ? (
+                  {imagePreviews[index] ? (
                     <div className="relative aspect-square">
                       <img
-                        src={images[index]}
+                        src={imagePreviews[index]!}
                         alt={`Product ${index + 1}`}
                         className="w-full h-full object-cover rounded-lg border border-gray-200"
                       />
@@ -298,6 +334,11 @@ export default function AddProductDialog({ isOpen, onClose, onSave, editProduct 
                       >
                         <X className="h-3 w-3" />
                       </button>
+                      {index === 0 && (
+                        <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-60 text-white text-xs py-1 text-center rounded-b-lg">
+                          Main Image
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div className="aspect-square border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center hover:border-gray-400 transition-colors">
@@ -313,8 +354,10 @@ export default function AddProductDialog({ isOpen, onClose, onSave, editProduct 
                         htmlFor={`image-${index}`}
                         className="cursor-pointer flex flex-col items-center justify-center p-2 text-gray-500 hover:text-gray-700"
                       >
-                        <Upload className="h-6 w-6 mb-1" />
-                        <span className="text-xs text-center">Image {index + 1}</span>
+                        <Upload className="h-8 w-8 mb-1" />
+                        <span className="text-xs text-center">
+                          {index === 0 ? "Main Image" : `Image ${index + 1}`}
+                        </span>
                       </label>
                     </div>
                   )}
@@ -330,16 +373,21 @@ export default function AddProductDialog({ isOpen, onClose, onSave, editProduct 
             <Button
               type="button"
               variant="outline"
-              onClick={onClose}
+              onClick={() => {
+                resetForm()
+                onClose()
+              }}
+              disabled={loading}
               className="border-2 border-gray-300 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-400"
             >
               Cancel
             </Button>
             <Button
               type="submit"
-              className="border-2 border-gray-300 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-400"
+              disabled={loading}
+              className="border-2 border-gray-300 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-400 disabled:opacity-50"
             >
-              {editProduct ? "Update Product" : "Add Product"}
+              {loading ? "Saving..." : editProduct ? "Update Product" : "Add Product"}
             </Button>
           </DialogFooter>
         </form>
@@ -347,4 +395,3 @@ export default function AddProductDialog({ isOpen, onClose, onSave, editProduct 
     </Dialog>
   )
 }
-

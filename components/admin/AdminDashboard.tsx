@@ -237,9 +237,9 @@ export default function AdminDashboard() {
                     <div className="flex items-start justify-between">
                       <div>
                         <CardTitle className="text-gray-900">{store.name}</CardTitle>
-                    <CardDescription className="text-gray-600">
+                        <CardDescription className="text-gray-600">
                       {store.vendors?.business_name || store.vendors?.vendor_name}
-                    </CardDescription>
+                        </CardDescription>
                         {store.category && (
                           <Badge className="mt-2 border-gray-200 bg-white text-gray-600">
                             {store.category}
@@ -399,12 +399,12 @@ export default function AdminDashboard() {
                         <p className="text-sm text-gray-600 mb-4 line-clamp-2">{store.description}</p>
                       )}
                       <div className="flex gap-2">
-                        <Button
-                          onClick={() => router.push(`/admin/store/${store.id}`)}
+                      <Button
+                        onClick={() => router.push(`/admin/store/${store.id}`)}
                           className="flex-1 border-2 border-gray-300 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-400"
-                        >
-                          View Details
-                        </Button>
+                      >
+                        View Details
+                      </Button>
                         <Button
                           onClick={() => handleSuspendStore(store.id)}
                           disabled={actionLoading === store.id}

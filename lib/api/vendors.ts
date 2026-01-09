@@ -126,6 +126,95 @@ export async function getTopVendors(limit: number = 10) {
   return data
 }
 
+// Get all vendors with stats, sorted by rating
+export async function getTopVendorsByRating(limit?: number) {
+  // First get all approved stores with vendor info
+  let query = supabase
+    .from('stores')
+    .select(`
+      id,
+      name,
+      description,
+      category,
+      logo_url,
+      created_at,
+      vendors (
+        id,
+        vendor_name,
+        business_name
+      )
+    `)
+    .eq('status', 'approved')
+    .order('created_at', { ascending: false })
+
+  const { data: stores, error: storesError } = await query
+
+  if (storesError) throw storesError
+  if (!stores) return []
+
+  // For each store, get aggregated stats
+  const storesWithStats = await Promise.all(
+    stores.map(async (store) => {
+      // Get product count
+      const { count: productCount } = await supabase
+        .from('products')
+        .select('*', { count: 'exact', head: true })
+        .eq('store_id', store.id)
+        .eq('available', true)
+
+      // Get service count
+      const { count: serviceCount } = await supabase
+        .from('services')
+        .select('*', { count: 'exact', head: true })
+        .eq('store_id', store.id)
+        .eq('available', true)
+
+      // Get total orders count for this store
+      const { count: ordersCount } = await supabase
+        .from('vendor_orders')
+        .select('*', { count: 'exact', head: true })
+        .eq('store_id', store.id)
+        .eq('status', 'completed')
+
+      // Get average rating from reviews
+      const { data: reviews } = await supabase
+        .from('reviews')
+        .select('rating')
+        .or(`product_id.in.(select id from products where store_id='${store.id}'),service_id.in.(select id from services where store_id='${store.id}')`)
+
+      const avgRating = reviews && reviews.length > 0
+        ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length
+        : 0
+
+      return {
+        id: store.id,
+        name: store.name,
+        description: store.description,
+        category: store.category || 'General',
+        logo_url: store.logo_url,
+        vendor_name: store.vendors?.vendor_name || store.vendors?.business_name || 'Unknown',
+        vendor_id: store.vendors?.id,
+        rating: Math.round(avgRating * 10) / 10,
+        totalReviews: reviews?.length || 0,
+        totalProducts: (productCount || 0) + (serviceCount || 0),
+        totalSales: ordersCount || 0,
+        verified: true,
+        joinDate: store.created_at
+      }
+    })
+  )
+
+  // Sort by rating (descending), then by total sales
+  const sorted = storesWithStats.sort((a, b) => {
+    if (b.rating !== a.rating) {
+      return b.rating - a.rating
+    }
+    return b.totalSales - a.totalSales
+  })
+
+  return limit ? sorted.slice(0, limit) : sorted
+}
+
 // ============================================
 // ADMIN FUNCTIONS
 // ============================================

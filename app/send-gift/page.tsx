@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 import OrderConfirmationModal, { OrderData } from "@/components/checkout/OrderConfirmationModal"
 import type { Product, Service } from "@/types"
 
-interface CartItem extends (Product | Service) {
+type CartItem = (Product | Service) & {
   quantity: number
   type: "product" | "service"
 }

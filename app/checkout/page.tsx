@@ -7,7 +7,7 @@ import { createOrder } from "@/lib/api/orders"
 import { getCurrentUser } from "@/lib/api/auth"
 import type { Product, Service } from "@/types"
 
-interface CartItem extends (Product | Service) {
+type CartItem = (Product | Service) & {
   quantity: number
   type: "product" | "service"
 }

@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import type { Product, Service } from "@/types"
 
-interface CartItem extends (Product | Service) {
+type CartItem = (Product | Service) & {
   quantity: number
   type: "product" | "service"
 }

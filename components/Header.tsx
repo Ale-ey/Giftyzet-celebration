@@ -235,6 +235,10 @@ export default function Header() {
                     <Heart className="h-4 w-4 mr-2" />
                     Wishlist
                   </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => router.push("/my-orders")} className="cursor-pointer text-black">
+                    <ShoppingBag className="h-4 w-4 mr-2" />
+                    My Orders
+                  </DropdownMenuItem>
                   {userRole === "vendor" && (
                     <DropdownMenuItem onClick={() => router.push("/vendor")} className="cursor-pointer text-black">
                       <Store className="h-4 w-4 mr-2" />

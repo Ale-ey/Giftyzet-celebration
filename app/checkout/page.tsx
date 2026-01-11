@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 import OrderConfirmationModal, { OrderData } from "@/components/checkout/OrderConfirmationModal"
 import { createOrder } from "@/lib/api/orders"
 import { getCurrentUser } from "@/lib/api/auth"
+import { useToast } from "@/components/ui/toast"
 import type { Product, Service } from "@/types"
 
 type CartItem = (Product | Service) & {
@@ -15,9 +16,9 @@ type CartItem = (Product | Service) & {
 export default function CheckoutPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { showToast } = useToast()
   const [cartItems, setCartItems] = useState<CartItem[]>([])
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [orderType, setOrderType] = useState<"self" | "gift">("self")
 
   useEffect(() => {
     // Load cart items
@@ -32,51 +33,45 @@ export default function CheckoutPage() {
       setCartItems(typedItems)
     }
 
-    // Check if coming from gift flow
-    const giftItems = searchParams.get("items")
-    if (giftItems) {
-      try {
-        const items = JSON.parse(decodeURIComponent(giftItems))
-        setCartItems(items.map((item: any) => ({
-          ...item,
-          type: item.type || "product"
-        })))
-        setOrderType("gift")
-        setIsModalOpen(true)
-      } catch (e) {
-        console.error("Error parsing gift items:", e)
-      }
-    } else {
-      // Open modal automatically for checkout
-      setIsModalOpen(true)
-    }
+    // Open modal automatically for checkout
+    setIsModalOpen(true)
   }, [searchParams])
 
   const handleConfirmOrder = async (orderData: OrderData) => {
     try {
+      showToast("Processing your order...", "info")
+      
       // Get current user (if logged in)
       const user = await getCurrentUser().catch(() => null)
 
       // Calculate totals
       const subtotal = cartItems.reduce((sum, item) => {
-        return sum + parseFloat(item.price.replace("$", "")) * item.quantity
+        const price = typeof item.price === 'string' 
+          ? parseFloat(item.price.replace(/[$₹]/g, ""))
+          : parseFloat(String(item.price))
+        return sum + (isNaN(price) ? 0 : price) * item.quantity
       }, 0)
       const shipping = subtotal > 0 ? 9.99 : 0
       const tax = subtotal * 0.08 // 8% tax
       const total = subtotal + shipping + tax
 
       // Prepare order items for API
-      const orderItems = cartItems.map(item => ({
-        item_type: item.type,
-        product_id: item.type === "product" ? item.id.toString() : undefined,
-        service_id: item.type === "service" ? item.id.toString() : undefined,
-        name: item.name,
-        price: parseFloat(item.price.replace("$", "")),
-        quantity: item.quantity,
-        image_url: item.image
-      }))
+      const orderItems = cartItems.map(item => {
+        const price = typeof item.price === 'string' 
+          ? parseFloat(item.price.replace(/[$₹]/g, ""))
+          : parseFloat(String(item.price))
+        return {
+          item_type: item.type,
+          product_id: item.type === "product" ? item.id.toString() : undefined,
+          service_id: item.type === "service" ? item.id.toString() : undefined,
+          name: item.name,
+          price: isNaN(price) ? 0 : price,
+          quantity: item.quantity,
+          image_url: item.image
+        }
+      })
 
-      // Create order via Supabase API
+      // Create order via Supabase API (with pending payment status)
       const { order, giftToken, giftLink } = await createOrder({
         user_id: user?.id || undefined,
         order_type: orderData.orderType,
@@ -96,20 +91,57 @@ export default function CheckoutPage() {
         total
       })
 
-      // Clear cart
+      // Create Stripe checkout session
+      const response = await fetch('/api/create-checkout-session', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          items: cartItems.map(item => ({
+            ...item,
+            description: item.description || '',
+            category: item.category || 'N/A',
+          })),
+          orderData,
+          orderId: order.id,
+          giftToken,
+        }),
+      })
+
+      const session = await response.json()
+
+      if (!response.ok) {
+        throw new Error(session.error || 'Failed to create checkout session')
+      }
+
+      // Verify we have a checkout URL
+      if (!session.url) {
+        throw new Error('No checkout URL received from Stripe')
+      }
+
+      // Store gift link delivery info in localStorage for order success page
+      if (orderData.orderType === "gift" && orderData.giftLinkDeliveryMethod) {
+        localStorage.setItem("giftLinkDelivery", JSON.stringify({
+          method: orderData.giftLinkDeliveryMethod,
+          receiverName: orderData.receiverName,
+          receiverEmail: orderData.receiverEmail,
+          receiverPhone: orderData.receiverPhone,
+          senderName: orderData.senderName,
+          giftLink: giftLink,
+          orderId: order.id
+        }))
+      }
+
+      // Clear cart before redirecting to Stripe
       localStorage.removeItem("cart")
       window.dispatchEvent(new Event("cartUpdated"))
-      window.dispatchEvent(new Event("ordersUpdated"))
 
-      // Redirect based on order type
-      if (orderData.orderType === "gift" && giftToken) {
-        router.push(`/order-success?token=${giftToken}&type=gift`)
-      } else {
-        router.push(`/order-success?orderId=${order.id}&type=self`)
-      }
+      // Redirect directly to Stripe Checkout URL (new method)
+      window.location.href = session.url
     } catch (error: any) {
       console.error("Error creating order:", error)
-      alert(`Failed to create order: ${error.message || "Please try again."}`)
+      showToast(error.message || "Failed to create order. Please try again.", "error")
     }
   }
 
@@ -139,7 +171,7 @@ export default function CheckoutPage() {
         }}
         onConfirm={handleConfirmOrder}
         cartItems={cartItems}
-        orderType={orderType}
+        orderType="self"
       />
     </>
   )

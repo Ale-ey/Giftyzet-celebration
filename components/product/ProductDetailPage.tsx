@@ -7,9 +7,11 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
 import { getProduct } from "@/lib/api/products"
+import { useToast } from "@/components/ui/toast"
 
 export default function ProductDetailPage({ productId }: { productId: string }) {
   const router = useRouter()
+  const { showToast } = useToast()
   const [quantity, setQuantity] = useState(1)
   const [selectedImageIndex, setSelectedImageIndex] = useState(0)
   const [product, setProduct] = useState<any>(null)
@@ -74,7 +76,7 @@ export default function ProductDetailPage({ productId }: { productId: string }) 
     const cartItem = {
       id: product.id,
       name: product.name,
-      price: product.price,
+      price: typeof product.price === 'number' ? `$${product.price}` : product.price,
       image: product.image_url,
       store_id: product.store_id,
       type: 'product',
@@ -100,8 +102,8 @@ export default function ProductDetailPage({ productId }: { productId: string }) 
     // Dispatch event to update cart count in header
     window.dispatchEvent(new Event("cartUpdated"))
     
-    // Show success message (in real app, use toast)
-    alert(`Added ${quantity} item(s) to cart!`)
+    // Show success message
+    showToast(`Added ${quantity} ${quantity > 1 ? 'items' : 'item'} to cart!`, "success")
   }
 
   const handleSendGift = () => {
@@ -203,10 +205,10 @@ export default function ProductDetailPage({ productId }: { productId: string }) 
             {/* Price */}
             <div className="border-t border-b border-gray-200 py-6 bg-gray-50/30">
               <div className="flex items-baseline space-x-4">
-                <span className="text-4xl font-semibold text-primary">₹{product.price.toFixed(2)}</span>
+                <span className="text-4xl font-semibold text-primary">${product.price.toFixed(2)}</span>
                 {product.original_price && product.original_price > product.price && (
                   <>
-                    <span className="text-xl text-gray-400 line-through">₹{product.original_price.toFixed(2)}</span>
+                    <span className="text-xl text-gray-400 line-through">${product.original_price.toFixed(2)}</span>
                     <Badge className="bg-red-500 text-white">
                       {Math.round((1 - product.price / product.original_price) * 100)}% OFF
                     </Badge>

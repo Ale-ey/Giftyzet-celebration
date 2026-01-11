@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { ShoppingCart, Trash2, Plus, Minus, ArrowLeft, Gift } from "lucide-react"
+import { ShoppingCart, Trash2, Plus, Minus, ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -49,8 +49,11 @@ export default function CartPage() {
 
   const calculateSubtotal = () => {
     return cartItems.reduce((total, item) => {
-      const price = parseFloat(item.price.replace("$", ""))
-      return total + price * item.quantity
+      // Handle both string and number prices
+      const price = typeof item.price === 'string' 
+        ? parseFloat(item.price.replace("$", ""))
+        : parseFloat(String(item.price))
+      return total + (isNaN(price) ? 0 : price) * item.quantity
     }, 0)
   }
 
@@ -179,7 +182,12 @@ export default function CartPage() {
                       <div className="mt-4 text-right">
                         <p className="text-sm text-gray-600">
                           Subtotal: <span className="font-bold text-gray-900">
-                            ${(parseFloat(item.price.replace("$", "")) * item.quantity).toFixed(2)}
+                            ${(() => {
+                              const price = typeof item.price === 'string' 
+                                ? parseFloat(item.price.replace("$", ""))
+                                : parseFloat(String(item.price))
+                              return ((isNaN(price) ? 0 : price) * item.quantity).toFixed(2)
+                            })()}
                           </span>
                         </p>
                       </div>
@@ -231,18 +239,6 @@ export default function CartPage() {
                     onClick={() => router.push("/checkout?type=self")}
                   >
                     Proceed to Checkout
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="w-full border-2 border-gray-300 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-400 font-medium"
-                    size="lg"
-                    onClick={() => {
-                      // Gift all items
-                      router.push(`/send-gift?items=${encodeURIComponent(JSON.stringify(cartItems))}`)
-                    }}
-                  >
-                    <Gift className="h-4 w-4 mr-2" />
-                    Gift All Items
                   </Button>
                 </div>
               </CardContent>

@@ -7,115 +7,108 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Pagination } from "@/components/ui/pagination"
-import { getStoreByVendorId, getOrdersByVendorId, updateOrderStatus } from "@/lib/vendor-data"
+import { getCurrentUserWithProfile } from "@/lib/api/auth"
+import { getOrdersByVendorId, updateVendorOrderStatus } from "@/lib/api/orders"
+import { useToast } from "@/components/ui/toast"
 import OrderDetailModal from "./OrderDetailModal"
 import type { Store, Order } from "@/types"
 
 export default function VendorOrdersPage() {
   const router = useRouter()
+  const { showToast } = useToast()
   const [store, setStore] = useState<Store | null>(null)
-  const [orders, setOrders] = useState<Order[]>([])
+  const [orders, setOrders] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [filter, setFilter] = useState<Order["status"] | "all">("all")
-  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
+  const [filter, setFilter] = useState<string>("all")
+  const [selectedOrder, setSelectedOrder] = useState<any>(null)
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
+  const [vendorId, setVendorId] = useState<string | null>(null)
   const itemsPerPage = 10
 
   useEffect(() => {
-    if (typeof window === "undefined") return
-
-    // Get logged-in vendor from auth
-    const authData = localStorage.getItem("auth")
-    let vendor = null
-    
-    if (authData) {
+    async function loadVendorOrders() {
       try {
-        const auth = JSON.parse(authData)
-        if (auth.role === "vendor" && auth.vendorName) {
-          const { getVendors, saveVendor, saveStore } = require("@/lib/vendor-data")
-          const vendors = getVendors()
-          vendor = vendors.find((v: any) => v.email === auth.email || v.vendorName === auth.vendorName)
-          
-          // Check if store is suspended
-          if (vendor) {
-            const vendorStore = getStoreByVendorId(vendor.id)
-            if (vendorStore?.status === "suspended") {
-              router.push("/vendor")
-              return
-            }
-          }
-          
-          if (!vendor && auth.vendorName) {
-            const vendorId = `vendor-${Date.now()}`
-            vendor = {
-              id: vendorId,
-              email: auth.email || "demo@vendor.com",
-              name: auth.name || "Vendor",
-              vendorName: auth.vendorName,
-              role: "vendor" as const,
-              createdAt: new Date().toISOString()
-            }
-            saveVendor(vendor)
-            
-            const store = {
-              id: `store-${Date.now()}`,
-              vendorId,
-              name: auth.vendorName,
-              status: "approved" as const,
-              createdAt: new Date().toISOString()
-            }
-            saveStore(store)
-          }
-        }
-      } catch (e) {
-        console.error("Error parsing auth data:", e)
-      }
-    }
-    
-    // Fallback to first vendor or create demo vendor
-    if (!vendor) {
-      const { getVendors, saveVendor, saveStore } = require("@/lib/vendor-data")
-      const vendors = getVendors()
-      vendor = vendors[0]
-      
-      if (!vendor) {
-        const vendorId = `vendor-${Date.now()}`
-        vendor = {
-          id: vendorId,
-          email: "demo@vendor.com",
-          name: "Demo Vendor",
-          vendorName: "Demo Store",
-          role: "vendor" as const,
-          createdAt: new Date().toISOString()
-        }
-        saveVendor(vendor)
+        setLoading(true)
         
-        const store = {
-          id: `store-${Date.now()}`,
-          vendorId,
-          name: "Demo Store",
-          status: "approved" as const,
-          createdAt: new Date().toISOString()
+        // Get current user with profile
+        const userProfile = await getCurrentUserWithProfile()
+        
+        if (!userProfile || userProfile.role !== 'vendor') {
+          showToast("You must be logged in as a vendor to view orders", "error")
+          router.push('/auth/login')
+          return
         }
-        saveStore(store)
+
+        // Get vendor record from vendors table
+        const { supabase } = await import('@/lib/supabase/client')
+        const { data: vendorData, error: vendorError } = await supabase
+          .from('vendors')
+          .select('id')
+          .eq('user_id', userProfile.id)
+          .single()
+
+        if (vendorError || !vendorData) {
+          showToast("Vendor profile not found", "error")
+          console.error('Vendor error:', vendorError)
+          setLoading(false)
+          return
+        }
+
+        setVendorId(vendorData.id)
+
+        // Fetch vendor orders from API
+        const vendorOrders = await getOrdersByVendorId(vendorData.id)
+        
+        // Transform the data to match the expected format
+        const formattedOrders = vendorOrders.map((vo: any) => ({
+          id: vo.orders.id,
+          orderNumber: vo.orders.order_number,
+          customerName: vo.orders.sender_name,
+          customerEmail: vo.orders.sender_email,
+          status: vo.status,
+          total: parseFloat(vo.orders.total),
+          orderType: vo.orders.order_type,
+          // Sender details
+          senderName: vo.orders.sender_name,
+          senderEmail: vo.orders.sender_email,
+          senderPhone: vo.orders.sender_phone,
+          senderAddress: vo.orders.sender_address,
+          // Receiver details (for gift orders)
+          receiverName: vo.orders.receiver_name,
+          receiverEmail: vo.orders.receiver_email,
+          receiverPhone: vo.orders.receiver_phone,
+          receiverAddress: vo.orders.receiver_address,
+          // Shipping address (for self orders)
+          shippingAddress: vo.orders.shipping_address,
+          items: vo.orders.order_items?.map((item: any) => ({
+            name: item.name,
+            type: item.item_type,
+            quantity: item.quantity,
+            price: `$${parseFloat(item.price).toFixed(2)}`,
+            image: item.image_url
+          })) || [],
+          createdAt: vo.orders.created_at,
+          confirmedAt: vo.orders.confirmed_at,
+          dispatchedAt: vo.orders.dispatched_at,
+          deliveredAt: vo.orders.delivered_at,
+          fullOrder: vo.orders // Keep full order data for modal
+        }))
+
+        setOrders(formattedOrders)
+        setLoading(false)
+      } catch (error: any) {
+        console.error('Error loading vendor orders:', error)
+        showToast(error.message || "Failed to load orders", "error")
+        setLoading(false)
       }
     }
 
-    // Initialize dummy orders for this vendor
-    const { initializeDummyOrders } = require("@/lib/product-data")
-    initializeDummyOrders(vendor.id, vendor.vendorName)
-
-    const vendorStore = getStoreByVendorId(vendor.id)
-    setStore(vendorStore || null)
-    const vendorOrders = getOrdersByVendorId(vendor.id)
-    setOrders(vendorOrders)
-    setLoading(false)
+    loadVendorOrders()
 
     // Listen for updates
     const handleUpdate = () => {
-      const updatedOrders = getOrdersByVendorId(vendor.id)
-      setOrders(updatedOrders)
+      loadVendorOrders()
     }
 
     window.addEventListener("ordersUpdated", handleUpdate)
@@ -123,19 +116,27 @@ export default function VendorOrdersPage() {
     return () => {
       window.removeEventListener("ordersUpdated", handleUpdate)
     }
-  }, [router])
+  }, [router, showToast])
 
-  const handleStatusUpdate = (orderId: string, newStatus: Order["status"]) => {
-    updateOrderStatus(orderId, newStatus)
-    const updatedOrders = orders.map((o) =>
-      o.id === orderId ? { ...o, status: newStatus } : o
-    )
-    setOrders(updatedOrders)
+  const handleStatusUpdate = async (orderId: string, newStatus: string) => {
+    if (!vendorId) return
+    
+    try {
+      await updateVendorOrderStatus(orderId, vendorId, newStatus as any)
+      const updatedOrders = orders.map((o) =>
+        o.id === orderId ? { ...o, status: newStatus } : o
+      )
+      setOrders(updatedOrders)
+      showToast(`Order status updated to ${newStatus}`, "success")
+    } catch (error: any) {
+      console.error('Error updating order status:', error)
+      showToast(error.message || "Failed to update order status", "error")
+    }
   }
 
   const filteredOrders = filter === "all" 
     ? orders 
-    : orders.filter((o) => o.status === filter)
+    : orders.filter((o) => o.status?.toLowerCase() === filter.toLowerCase())
 
   // Pagination calculations
   const totalPages = Math.ceil(filteredOrders.length / itemsPerPage)
@@ -144,7 +145,7 @@ export default function VendorOrdersPage() {
   const paginatedOrders = filteredOrders.slice(startIndex, endIndex)
 
   // Reset to page 1 when filter changes
-  const handleFilterChange = (newFilter: Order["status"] | "all") => {
+  const handleFilterChange = (newFilter: string) => {
     setFilter(newFilter)
     setCurrentPage(1)
   }
@@ -157,8 +158,8 @@ export default function VendorOrdersPage() {
     )
   }
 
-  const getStatusBadge = (status: Order["status"]) => {
-    switch (status) {
+  const getStatusBadge = (status: string) => {
+    switch (status?.toLowerCase()) {
       case "pending":
         return (
           <Badge className="bg-yellow-50 text-yellow-700 border-yellow-200">

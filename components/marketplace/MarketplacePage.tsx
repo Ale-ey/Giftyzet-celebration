@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { useToast } from "@/components/ui/toast"
 import { STORE_CATEGORIES } from "@/lib/constants"
 import { getApprovedProducts } from "@/lib/api/products"
 
@@ -17,6 +18,7 @@ const categories = [
 
 export default function MarketplacePage() {
   const router = useRouter()
+  const { showToast } = useToast()
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedCategory, setSelectedCategory] = useState("all")
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
@@ -80,7 +82,7 @@ export default function MarketplacePage() {
     
     localStorage.setItem("cart", JSON.stringify(existingCart))
     window.dispatchEvent(new Event("cartUpdated"))
-    alert(`Added ${product.name} to cart!`)
+    showToast(`Added ${product.name} to cart!`, "success")
   }
 
   const handleBuyNow = (product: any) => {
@@ -185,10 +187,12 @@ export default function MarketplacePage() {
                   {filteredProducts.map((product) => (
                     <Card 
                       key={product.id} 
-                      className="group border border-gray-200 bg-white overflow-hidden hover:shadow-lg transition-all duration-300 cursor-pointer"
-                      onClick={() => router.push(`/product/${product.id}`)}
+                      className="group border border-gray-200 bg-white overflow-hidden hover:shadow-lg transition-all duration-300"
                     >
-                      <div className="aspect-square overflow-hidden bg-gray-100 relative">
+                      <div 
+                        className="aspect-square overflow-hidden bg-gray-100 relative cursor-pointer"
+                        onClick={() => router.push(`/product/${product.id}`)}
+                      >
                         {product.image_url ? (
                           <img
                             src={product.image_url}
@@ -208,7 +212,10 @@ export default function MarketplacePage() {
                       </div>
                       <CardContent className="p-4">
                         <div className="mb-2">
-                          <h3 className="font-semibold text-gray-900 line-clamp-2 mb-1 group-hover:text-primary transition-colors">
+                          <h3 
+                            className="font-semibold text-gray-900 line-clamp-2 mb-1 group-hover:text-primary transition-colors cursor-pointer"
+                            onClick={() => router.push(`/product/${product.id}`)}
+                          >
                             {product.name}
                           </h3>
                           <p className="text-xs text-gray-500">
@@ -249,31 +256,14 @@ export default function MarketplacePage() {
                           {product.category}
                         </Badge>
 
-                        <div className="flex gap-2">
-                          <Button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleAddToCart(product)
-                            }}
-                            size="sm"
-                            variant="outline"
-                            className="flex-1 border-2 border-gray-300 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-400"
-                          >
-                            <ShoppingCart className="h-3 w-3 mr-1" />
-                            Add
-                          </Button>
-                          <Button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleGiftNow(product)
-                            }}
-                            size="sm"
-                            className="flex-1 bg-primary hover:bg-primary/90 text-white"
-                          >
-                            <Gift className="h-3 w-3 mr-1" />
-                            Gift
-                          </Button>
-                        </div>
+                        <Button
+                          onClick={() => handleAddToCart(product)}
+                          size="sm"
+                          className="w-full bg-red-500 hover:bg-red-600 text-white font-medium"
+                        >
+                          <ShoppingCart className="h-4 w-4 mr-2" />
+                          Add to Cart
+                        </Button>
                 </CardContent>
               </Card>
                 ))}

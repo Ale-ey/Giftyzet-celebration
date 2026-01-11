@@ -67,7 +67,10 @@ export default function SendGiftPage() {
         items: cartItems,
         ...orderData,
         total: cartItems.reduce((sum, item) => {
-          return sum + parseFloat(item.price.replace("$", "")) * item.quantity
+          const price = typeof item.price === 'string' 
+            ? parseFloat(item.price.replace("$", ""))
+            : parseFloat(String(item.price))
+          return sum + (isNaN(price) ? 0 : price) * item.quantity
         }, 0),
         status: "pending", // Gift orders start as pending until receiver confirms
         createdAt: new Date().toISOString(),

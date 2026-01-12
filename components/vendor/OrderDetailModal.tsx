@@ -132,7 +132,7 @@ export default function OrderDetailModal({ isOpen, onClose, order, onStatusUpdat
             </div>
           </div>
 
-          {/* Order Type and Addresses */}
+          {/* Order Type and Shipping Details */}
           <div>
             <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center">
               <MapPin className="h-5 w-5 mr-2" />
@@ -144,55 +144,120 @@ export default function OrderDetailModal({ isOpen, onClose, order, onStatusUpdat
                 {order.orderType === "gift" ? (
                   <>
                     <Gift className="h-5 w-5 text-primary" />
-                    <Badge className="bg-primary/10 text-primary border-primary/20">
-                      Gift Order
+                    <Badge className="bg-primary/10 text-primary border-primary/20 text-base px-3 py-1">
+                      🎁 Gift Order
                     </Badge>
                   </>
                 ) : (
                   <>
                     <Package className="h-5 w-5 text-gray-600" />
-                    <Badge className="bg-gray-100 text-gray-700 border-gray-200">
-                      Self Order
+                    <Badge className="bg-gray-100 text-gray-700 border-gray-200 text-base px-3 py-1">
+                      📦 Self Order
                     </Badge>
                   </>
                 )}
               </div>
 
-              {/* Addresses */}
+              {/* Shipping Details Based on Order Type */}
               {order.orderType === "gift" ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Sender Address */}
+                  {/* Sender Details */}
                   <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                    <h4 className="font-semibold text-gray-900 mb-2">Sender Address</h4>
-                    <p className="text-sm text-gray-700 whitespace-pre-line">
-                      {order.senderAddress || "Not provided"}
-                    </p>
+                    <h4 className="font-semibold text-gray-900 mb-3 flex items-center">
+                      <User className="h-4 w-4 mr-2" />
+                      Sender (Orderer)
+                    </h4>
+                    <div className="space-y-2 text-sm">
+                      <div>
+                        <p className="text-gray-600 font-medium">Name:</p>
+                        <p className="text-gray-900">{order.senderName || "Not provided"}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-600 font-medium">Email:</p>
+                        <p className="text-gray-900">{order.senderEmail || "Not provided"}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-600 font-medium">Phone:</p>
+                        <p className="text-gray-900">{order.senderPhone || "Not provided"}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-600 font-medium">Address:</p>
+                        <p className="text-gray-900 whitespace-pre-line">{order.senderAddress || "Not provided"}</p>
+                      </div>
+                    </div>
                   </div>
 
-                  {/* Receiver Address */}
+                  {/* Receiver Details (Ship To) */}
                   <div className={`p-4 rounded-lg border ${
                     order.receiverAddress 
                       ? "bg-green-50 border-green-200" 
                       : "bg-yellow-50 border-yellow-200"
                   }`}>
-                    <h4 className="font-semibold text-gray-900 mb-2">Receiver Address</h4>
+                    <h4 className="font-semibold text-gray-900 mb-3 flex items-center">
+                      <MapPin className="h-4 w-4 mr-2" />
+                      Receiver (Ship To)
+                    </h4>
                     {order.receiverAddress ? (
-                      <p className="text-sm text-gray-700 whitespace-pre-line">
-                        {order.receiverAddress}
-                      </p>
+                      <div className="space-y-2 text-sm">
+                        <div>
+                          <p className="text-gray-600 font-medium">Name:</p>
+                          <p className="text-gray-900">{order.receiverName || "Not provided"}</p>
+                        </div>
+                        <div>
+                          <p className="text-gray-600 font-medium">Email:</p>
+                          <p className="text-gray-900">{order.receiverEmail || "Not provided"}</p>
+                        </div>
+                        <div>
+                          <p className="text-gray-600 font-medium">Phone:</p>
+                          <p className="text-gray-900">{order.receiverPhone || "Not provided"}</p>
+                        </div>
+                        <div>
+                          <p className="text-gray-600 font-medium">Address:</p>
+                          <p className="text-gray-900 whitespace-pre-line">{order.receiverAddress}</p>
+                        </div>
+                        <div className="mt-3 pt-3 border-t border-green-300">
+                          <p className="text-green-700 font-semibold text-xs">✓ Ready to Ship</p>
+                        </div>
+                      </div>
                     ) : (
-                      <p className="text-sm text-yellow-700 italic">
-                        Waiting for receiver to provide address
-                      </p>
+                      <div className="space-y-2">
+                        <p className="text-sm text-yellow-700 italic">
+                          ⏳ Waiting for receiver to provide shipping details
+                        </p>
+                        <div className="text-xs text-yellow-600 mt-2">
+                          <p>Receiver will fill via gift link:</p>
+                          <p className="font-medium">{order.receiverEmail || "Email pending"}</p>
+                        </div>
+                      </div>
                     )}
                   </div>
                 </div>
               ) : (
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <h4 className="font-semibold text-gray-900 mb-2">Shipping Address</h4>
-                  <p className="text-sm text-gray-700 whitespace-pre-line">
-                    {order.shippingAddress || order.senderAddress || "Not provided"}
-                  </p>
+                <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                  <h4 className="font-semibold text-gray-900 mb-3 flex items-center">
+                    <MapPin className="h-4 w-4 mr-2" />
+                    Ship To (Customer)
+                  </h4>
+                  <div className="space-y-2 text-sm">
+                    <div>
+                      <p className="text-gray-600 font-medium">Name:</p>
+                      <p className="text-gray-900">{order.senderName || order.customerName || "Not provided"}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-600 font-medium">Email:</p>
+                      <p className="text-gray-900">{order.senderEmail || order.customerEmail || "Not provided"}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-600 font-medium">Phone:</p>
+                      <p className="text-gray-900">{order.senderPhone || "Not provided"}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-600 font-medium">Shipping Address:</p>
+                      <p className="text-gray-900 whitespace-pre-line">
+                        {order.shippingAddress || order.senderAddress || "Not provided"}
+                      </p>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
@@ -233,42 +298,77 @@ export default function OrderDetailModal({ isOpen, onClose, order, onStatusUpdat
 
           {/* Action Buttons */}
           {onStatusUpdate && (
-            <div className="flex gap-3 pt-4 border-t border-gray-200">
+            <div className="space-y-3 pt-4 border-t border-gray-200">
+              {/* Confirm Order Button */}
               {order.status === "pending" && (
-                <Button
-                  onClick={() => {
-                    if (order.orderType === "gift" && !order.receiverAddress) {
-                      alert("Cannot confirm order: Receiver address is required for gift orders.")
-                      return
-                    }
-                    onStatusUpdate(order.id, "confirmed")
-                    onClose()
-                  }}
-                  className="flex-1 bg-primary hover:bg-primary/90 text-white"
-                >
-                  <CheckCircle2 className="h-4 w-4 mr-2" />
-                  Confirm Order
-                </Button>
+                <>
+                  <Button
+                    onClick={() => {
+                      if (order.orderType === "gift" && !order.receiverAddress) {
+                        alert("Cannot confirm order: Receiver address is required for gift orders.")
+                        return
+                      }
+                      onStatusUpdate(order.id, "confirmed")
+                      onClose()
+                    }}
+                    disabled={order.orderType === "gift" && !order.receiverAddress}
+                    className="w-full bg-primary hover:bg-primary/90 text-white disabled:bg-gray-300 disabled:cursor-not-allowed"
+                  >
+                    <CheckCircle2 className="h-4 w-4 mr-2" />
+                    {order.orderType === "gift" && !order.receiverAddress 
+                      ? "Waiting for Receiver Address"
+                      : "Confirm Order"}
+                  </Button>
+                  {order.orderType === "gift" && !order.receiverAddress && (
+                    <p className="text-xs text-yellow-600 text-center">
+                      ⏳ Cannot confirm until receiver provides shipping address via gift link
+                    </p>
+                  )}
+                </>
               )}
+              
+              {/* Dispatch Button */}
               {order.status === "confirmed" && (
-                <Button
-                  onClick={() => {
-                    onStatusUpdate(order.id, "dispatched")
-                    onClose()
-                  }}
-                  className="flex-1 bg-purple-600 hover:bg-purple-700 text-white"
-                >
-                  <Truck className="h-4 w-4 mr-2" />
-                  Mark as Dispatched
-                </Button>
+                <>
+                  <Button
+                    onClick={() => {
+                      onStatusUpdate(order.id, "dispatched")
+                      onClose()
+                    }}
+                    disabled={order.orderType === "gift" && !order.receiverAddress}
+                    className="w-full bg-purple-600 hover:bg-purple-700 text-white disabled:bg-gray-300 disabled:cursor-not-allowed"
+                  >
+                    <Truck className="h-4 w-4 mr-2" />
+                    {order.orderType === "gift" && !order.receiverAddress
+                      ? "Cannot Dispatch - No Address"
+                      : "Mark as Dispatched"}
+                  </Button>
+                  {order.orderType === "gift" && !order.receiverAddress && (
+                    <p className="text-xs text-yellow-600 text-center">
+                      ⏳ Cannot dispatch until receiver provides shipping address
+                    </p>
+                  )}
+                  {order.orderType === "self" && (
+                    <p className="text-xs text-green-600 text-center">
+                      ✓ Shipping address confirmed - Ready to dispatch
+                    </p>
+                  )}
+                  {order.orderType === "gift" && order.receiverAddress && (
+                    <p className="text-xs text-green-600 text-center">
+                      ✓ Receiver address confirmed - Ready to dispatch
+                    </p>
+                  )}
+                </>
               )}
+              
+              {/* Delivered Button */}
               {order.status === "dispatched" && (
                 <Button
                   onClick={() => {
                     onStatusUpdate(order.id, "delivered")
                     onClose()
                   }}
-                  className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                  className="w-full bg-green-600 hover:bg-green-700 text-white"
                 >
                   <Package className="h-4 w-4 mr-2" />
                   Mark as Delivered

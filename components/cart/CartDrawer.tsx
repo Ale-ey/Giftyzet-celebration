@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { X, Trash2, Plus, Minus, ShoppingCart, Gift, ArrowRight } from "lucide-react"
+import { X, Trash2, Plus, Minus, ShoppingCart, ArrowRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import type { Product } from "@/types"
@@ -72,8 +72,11 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
 
   const calculateSubtotal = () => {
     return cartItems.reduce((total, item) => {
-      const price = parseFloat(item.price.replace("$", ""))
-      return total + price * item.quantity
+      // Handle both string and number prices
+      const price = typeof item.price === 'string' 
+        ? parseFloat(item.price.replace("$", ""))
+        : parseFloat(String(item.price))
+      return total + (isNaN(price) ? 0 : price) * item.quantity
     }, 0)
   }
 
@@ -86,7 +89,7 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
 
   const handleCheckout = () => {
     onClose()
-    router.push("/checkout")
+    router.push("/checkout?type=self")
   }
 
   const handleViewCart = () => {
@@ -257,17 +260,6 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                 >
                   Proceed to Checkout
                   <ArrowRight className="h-4 w-4 ml-2" />
-                </Button>
-                <Button
-                  variant="outline"
-                  className="w-full border-2 border-gray-300 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-400 font-medium"
-                  onClick={() => {
-                    router.push(`/send-gift?items=${encodeURIComponent(JSON.stringify(cartItems))}`)
-                    onClose()
-                  }}
-                >
-                  <Gift className="h-4 w-4 mr-2" />
-                  Gift All Items
                 </Button>
                 <Button
                   variant="outline"

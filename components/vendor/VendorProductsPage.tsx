@@ -6,247 +6,167 @@ import { Plus, Package, Wrench, ArrowLeft, Edit, Trash2 } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Pagination } from "@/components/ui/pagination"
-import { getStoreByVendorId, getVendors } from "@/lib/vendor-data"
-import { getVendorProducts, getVendorServices, saveVendorProduct, saveVendorService, deleteVendorProduct, deleteVendorService, initializeDummyVendorData } from "@/lib/product-data"
+import { getCurrentUser } from "@/lib/api/auth"
+import { getVendorByUserId, getStoreByVendorId } from "@/lib/api/vendors"
+import { 
+  getProductsByStore, 
+  getServicesByStore, 
+  deleteProduct as apiDeleteProduct,
+  deleteService as apiDeleteService
+} from "@/lib/api/products"
 import AddProductDialog from "./AddProductDialog"
 import AddServiceDialog from "./AddServiceDialog"
 import DeleteConfirmationModal from "./DeleteConfirmationModal"
-import type { Store, Product, Service } from "@/types"
-import { allProducts, allServices } from "@/lib/constants"
 
 export default function VendorProductsPage() {
   const router = useRouter()
-  const [store, setStore] = useState<Store | null>(null)
+  const [store, setStore] = useState<any | null>(null)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<"products" | "services">("products")
-  const [vendorProducts, setVendorProducts] = useState<Product[]>([])
-  const [vendorServices, setVendorServices] = useState<Service[]>([])
+  const [vendorProducts, setVendorProducts] = useState<any[]>([])
+  const [vendorServices, setVendorServices] = useState<any[]>([])
   const [isProductDialogOpen, setIsProductDialogOpen] = useState(false)
   const [isServiceDialogOpen, setIsServiceDialogOpen] = useState(false)
-  const [editingProduct, setEditingProduct] = useState<Product | null>(null)
-  const [editingService, setEditingService] = useState<Service | null>(null)
+  const [editingProduct, setEditingProduct] = useState<any | null>(null)
+  const [editingService, setEditingService] = useState<any | null>(null)
   const [deleteModalOpen, setDeleteModalOpen] = useState(false)
-  const [itemToDelete, setItemToDelete] = useState<{ id: number; name: string; type: "product" | "service" } | null>(null)
+  const [itemToDelete, setItemToDelete] = useState<{ id: string; name: string; type: "product" | "service" } | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
+  const [actionLoading, setActionLoading] = useState(false)
   const itemsPerPage = 12
 
   useEffect(() => {
-    if (typeof window === "undefined") return
+    loadVendorData()
+  }, [])
 
-    // Get logged-in vendor from auth
-    const authData = localStorage.getItem("auth")
-    let vendor = null
-    
-    if (authData) {
-      try {
-        const auth = JSON.parse(authData)
-        if (auth.role === "vendor" && auth.vendorName) {
-          // Find vendor by email or vendorName
-          const vendors = getVendors()
-          vendor = vendors.find((v) => v.email === auth.email || v.vendorName === auth.vendorName)
-          
-          // If vendor doesn't exist in vendors list, create it
-          if (!vendor && auth.vendorName) {
-            const { saveVendor, saveStore } = require("@/lib/vendor-data")
-            const vendorId = `vendor-${Date.now()}`
-            vendor = {
-              id: vendorId,
-              email: auth.email || "demo@vendor.com",
-              name: auth.name || "Vendor",
-              vendorName: auth.vendorName,
-              role: "vendor" as const,
-              createdAt: new Date().toISOString()
-            }
-            saveVendor(vendor)
-            
-            // Create store with approved status
-            const store = {
-              id: `store-${Date.now()}`,
-              vendorId,
-              name: auth.vendorName,
-              status: "approved" as const,
-              createdAt: new Date().toISOString()
-            }
-            saveStore(store)
-          }
-        }
-      } catch (e) {
-        console.error("Error parsing auth data:", e)
-      }
-    }
-    
-    // Fallback to first vendor or create demo vendor
-    if (!vendor) {
-      const vendors = getVendors()
-      vendor = vendors[0]
+  const loadVendorData = async () => {
+    try {
+      setLoading(true)
       
-      if (!vendor) {
-        const { saveVendor, saveStore } = require("@/lib/vendor-data")
-        const vendorId = `vendor-${Date.now()}`
-        vendor = {
-          id: vendorId,
-          email: "demo@vendor.com",
-          name: "Demo Vendor",
-          vendorName: "Demo Store",
-          role: "vendor" as const,
-          createdAt: new Date().toISOString()
-        }
-        saveVendor(vendor)
-        
-        const store = {
-          id: `store-${Date.now()}`,
-          vendorId,
-          name: "Demo Store",
-          status: "approved" as const,
-          createdAt: new Date().toISOString()
-        }
-        saveStore(store)
+      // Get current user
+      const user = await getCurrentUser()
+      if (!user) {
+        router.push("/")
+        return
       }
-    }
 
-    // Initialize dummy vendor data for this vendor
-    initializeDummyVendorData(vendor.vendorName, vendor.id)
-
-    const vendorStore = getStoreByVendorId(vendor.id)
-    setStore(vendorStore || null)
-    
-    // Get vendor products/services from localStorage and combine with default products
-    const customProducts = getVendorProducts().filter((p) => p.vendor === vendor.vendorName)
-    const defaultProducts = allProducts.filter((p) => p.vendor === vendor.vendorName)
-    const allVendorProducts = [...defaultProducts, ...customProducts]
-    
-    const customServices = getVendorServices().filter((s) => s.vendor === vendor.vendorName)
-    const defaultServices = allServices.filter((s) => s.vendor === vendor.vendorName)
-    const allVendorServices = [...defaultServices, ...customServices]
-    
-    setVendorProducts(allVendorProducts)
-    setVendorServices(allVendorServices)
-    
-    setLoading(false)
-
-    // Listen for updates
-    const handleProductsUpdate = () => {
-      const updated = getVendorProducts().filter((p) => p.vendor === vendor.vendorName)
-      const defaultProds = allProducts.filter((p) => p.vendor === vendor.vendorName)
-      setVendorProducts([...defaultProds, ...updated])
-    }
-
-    const handleServicesUpdate = () => {
-      const updated = getVendorServices().filter((s) => s.vendor === vendor.vendorName)
-      const defaultServs = allServices.filter((s) => s.vendor === vendor.vendorName)
-      setVendorServices([...defaultServs, ...updated])
-    }
-
-    window.addEventListener("vendorProductsUpdated", handleProductsUpdate)
-    window.addEventListener("vendorServicesUpdated", handleServicesUpdate)
-
-    return () => {
-      window.removeEventListener("vendorProductsUpdated", handleProductsUpdate)
-      window.removeEventListener("vendorServicesUpdated", handleServicesUpdate)
-    }
-  }, [router])
-
-  const handleAddProduct = (productData: Omit<Product, "id" | "rating" | "reviews" | "vendor">) => {
-    const vendors = getVendors()
-    const vendor = vendors[0]
-    if (!vendor) return
-
-    if (editingProduct) {
-      // Update existing product
-      const updatedProduct: Product = {
-        ...editingProduct,
-        ...productData
+      // Get vendor profile
+      const vendor = await getVendorByUserId(user.id)
+    if (!vendor) {
+        router.push("/vendor/register-store")
+        return
       }
-      saveVendorProduct(updatedProduct)
-      setEditingProduct(null)
-    } else {
-      // Add new product
-      const newProduct: Product = {
-        ...productData,
-        id: Date.now(),
-        rating: 0,
-        reviews: 0,
-        vendor: vendor.vendorName
+
+      // Get store
+      const vendorStore = await getStoreByVendorId(vendor.id)
+      if (!vendorStore) {
+        router.push("/vendor/register-store")
+        return
       }
-      saveVendorProduct(newProduct)
+
+      // Check if store is suspended
+      if (vendorStore.status === "suspended") {
+        router.push("/vendor")
+        return
+      }
+
+      // Check if store is not approved
+      if (vendorStore.status !== "approved") {
+        router.push("/vendor/register-store")
+        return
+      }
+
+      setStore(vendorStore)
+
+      // Load products and services from Supabase
+      await loadProducts(vendorStore.id)
+      await loadServices(vendorStore.id)
+    } catch (error) {
+      console.error("Error loading vendor data:", error)
+      router.push("/")
+    } finally {
+      setLoading(false)
     }
-    
-    const updated = getVendorProducts().filter((p) => p.vendor === vendor.vendorName)
-    const defaultProds = allProducts.filter((p) => p.vendor === vendor.vendorName)
-    setVendorProducts([...defaultProds, ...updated])
   }
 
-  const handleAddService = (serviceData: Omit<Service, "id" | "rating" | "reviews" | "vendor">) => {
-    const vendors = getVendors()
-    const vendor = vendors[0]
-    if (!vendor) return
-
-    if (editingService) {
-      // Update existing service
-      const updatedService: Service = {
-        ...editingService,
-        ...serviceData
-      }
-      saveVendorService(updatedService)
-      setEditingService(null)
-    } else {
-      // Add new service
-      const newService: Service = {
-        ...serviceData,
-        id: Date.now(),
-        rating: 0,
-        reviews: 0,
-        vendor: vendor.vendorName
-      }
-      saveVendorService(newService)
+  const loadProducts = async (storeId: string) => {
+    try {
+      const products = await getProductsByStore(storeId)
+      setVendorProducts(products || [])
+    } catch (error) {
+      console.error("Error loading products:", error)
+      setVendorProducts([])
     }
-    
-    const updated = getVendorServices().filter((s) => s.vendor === vendor.vendorName)
-    const defaultServs = allServices.filter((s) => s.vendor === vendor.vendorName)
-    setVendorServices([...defaultServs, ...updated])
   }
 
-  const handleEditProduct = (product: Product) => {
+  const loadServices = async (storeId: string) => {
+    try {
+      const services = await getServicesByStore(storeId)
+      setVendorServices(services || [])
+    } catch (error) {
+      console.error("Error loading services:", error)
+      setVendorServices([])
+    }
+  }
+
+  const handleAddProduct = async () => {
+    if (!store) return
+    
+    try {
+      // Reload products after save
+      await loadProducts(store.id)
+    } catch (error) {
+      console.error("Error reloading products:", error)
+    }
+  }
+
+  const handleAddService = async () => {
+    if (!store) return
+    
+    try {
+      // Reload services after save
+      await loadServices(store.id)
+    } catch (error) {
+      console.error("Error reloading services:", error)
+    }
+  }
+
+  const handleEditProduct = (product: any) => {
     setEditingProduct(product)
     setIsProductDialogOpen(true)
   }
 
-  const handleEditService = (service: Service) => {
+  const handleEditService = (service: any) => {
     setEditingService(service)
     setIsServiceDialogOpen(true)
   }
 
-  const handleDeleteClick = (id: number, name: string, type: "product" | "service") => {
+  const handleDeleteClick = (id: string, name: string, type: "product" | "service") => {
     setItemToDelete({ id, name, type })
     setDeleteModalOpen(true)
   }
 
-  const handleDeleteConfirm = () => {
-    if (!itemToDelete) return
+  const handleDeleteConfirm = async () => {
+    if (!itemToDelete || !store) return
 
+    setActionLoading(true)
+    try {
     if (itemToDelete.type === "product") {
-      deleteVendorProduct(itemToDelete.id)
-      const vendors = getVendors()
-      const vendor = vendors[0]
-      if (vendor) {
-        const updated = getVendorProducts().filter((p) => p.vendor === vendor.vendorName)
-        const defaultProds = allProducts.filter((p) => p.vendor === vendor.vendorName)
-        setVendorProducts([...defaultProds, ...updated])
+        await apiDeleteProduct(itemToDelete.id)
+        await loadProducts(store.id)
+      } else {
+        await apiDeleteService(itemToDelete.id)
+        await loadServices(store.id)
       }
-    } else {
-      deleteVendorService(itemToDelete.id)
-      const vendors = getVendors()
-      const vendor = vendors[0]
-      if (vendor) {
-        const updated = getVendorServices().filter((s) => s.vendor === vendor.vendorName)
-        const defaultServs = allServices.filter((s) => s.vendor === vendor.vendorName)
-        setVendorServices([...defaultServs, ...updated])
-      }
+    } catch (error) {
+      console.error("Error deleting item:", error)
+      alert(`Failed to delete ${itemToDelete.type}. Please try again.`)
+    } finally {
+      setActionLoading(false)
+      setItemToDelete(null)
+      setDeleteModalOpen(false)
     }
-
-    setItemToDelete(null)
   }
 
   if (loading) {
@@ -262,7 +182,7 @@ export default function VendorProductsPage() {
       <div className="container mx-auto px-4 py-8">
         <Button
           variant="ghost"
-          onClick={() => router.push("/vendor")}
+          onClick={() => router.push("/vendor/dashboard")}
           className="mb-6 text-gray-900 hover:text-primary hover:bg-primary/10"
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
@@ -354,18 +274,24 @@ export default function VendorProductsPage() {
                   paginatedProducts.map((product) => (
                 <Card key={product.id} className="border border-gray-200 bg-white">
                   <div className="aspect-square overflow-hidden rounded-t-lg bg-gray-100">
+                    {product.image_url ? (
                     <img
-                      src={product.image}
+                        src={product.image_url}
                       alt={product.name}
                       className="w-full h-full object-cover"
                     />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-gray-200">
+                        <Package className="h-16 w-16 text-gray-400" />
+                      </div>
+                    )}
                   </div>
                   <CardHeader>
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
                         <CardTitle className="text-gray-900">{product.name}</CardTitle>
                         <CardDescription className="text-gray-600">
-                          {product.price} • {product.category}
+                          ${product.price} • {product.category}
                         </CardDescription>
                       </div>
                       <Badge className={product.available !== false ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}>
@@ -379,7 +305,8 @@ export default function VendorProductsPage() {
                         variant="outline"
                         size="sm"
                         onClick={() => handleEditProduct(product)}
-                        className="flex-1 border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                        disabled={actionLoading}
+                        className="flex-1 border-gray-200 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-50"
                       >
                         <Edit className="h-4 w-4 mr-1" />
                         Edit
@@ -388,7 +315,8 @@ export default function VendorProductsPage() {
                         variant="outline"
                         size="sm"
                         onClick={() => handleDeleteClick(product.id, product.name, "product")}
-                        className="border-gray-200 bg-white text-gray-700 hover:bg-gray-50 hover:text-red-600"
+                        disabled={actionLoading}
+                        className="border-gray-200 bg-white text-gray-700 hover:bg-gray-50 hover:text-red-600 disabled:opacity-50"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -444,18 +372,24 @@ export default function VendorProductsPage() {
                   paginatedServices.map((service) => (
                 <Card key={service.id} className="border border-gray-200 bg-white">
                   <div className="aspect-square overflow-hidden rounded-t-lg bg-gray-100">
+                    {service.image_url ? (
                     <img
-                      src={service.image}
+                        src={service.image_url}
                       alt={service.name}
                       className="w-full h-full object-cover"
                     />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-gray-200">
+                        <Wrench className="h-16 w-16 text-gray-400" />
+                      </div>
+                    )}
                   </div>
                   <CardHeader>
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
                         <CardTitle className="text-gray-900">{service.name}</CardTitle>
                         <CardDescription className="text-gray-600">
-                          {service.price} • {service.category}
+                          ${service.price} • {service.category}
                         </CardDescription>
                       </div>
                       <Badge className={service.available !== false ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}>
@@ -469,7 +403,8 @@ export default function VendorProductsPage() {
                         variant="outline"
                         size="sm"
                         onClick={() => handleEditService(service)}
-                        className="flex-1 border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                        disabled={actionLoading}
+                        className="flex-1 border-gray-200 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-50"
                       >
                         <Edit className="h-4 w-4 mr-1" />
                         Edit
@@ -478,7 +413,8 @@ export default function VendorProductsPage() {
                         variant="outline"
                         size="sm"
                         onClick={() => handleDeleteClick(service.id, service.name, "service")}
-                        className="border-gray-200 bg-white text-gray-700 hover:bg-gray-50 hover:text-red-600"
+                        disabled={actionLoading}
+                        className="border-gray-200 bg-white text-gray-700 hover:bg-gray-50 hover:text-red-600 disabled:opacity-50"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -512,6 +448,7 @@ export default function VendorProductsPage() {
           }}
           onSave={handleAddProduct}
           editProduct={editingProduct}
+          storeId={store?.id}
         />
         <AddServiceDialog
           isOpen={isServiceDialogOpen}
@@ -521,6 +458,7 @@ export default function VendorProductsPage() {
           }}
           onSave={handleAddService}
           editService={editingService}
+          storeId={store?.id}
         />
         <DeleteConfirmationModal
           isOpen={deleteModalOpen}

@@ -13,29 +13,31 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { STORE_CATEGORIES } from "@/lib/constants"
-import type { Service } from "@/types"
+import { createService, updateService } from "@/lib/api/products"
 
 interface AddServiceDialogProps {
   isOpen: boolean
   onClose: () => void
-  onSave: (service: Omit<Service, "id" | "rating" | "reviews" | "vendor">) => void
-  editService?: Service | null
+  onSave: () => void
+  editService?: any | null
+  storeId?: string
 }
 
-export default function AddServiceDialog({ isOpen, onClose, onSave, editService }: AddServiceDialogProps) {
+export default function AddServiceDialog({ isOpen, onClose, onSave, editService, storeId }: AddServiceDialogProps) {
   const [formData, setFormData] = useState({
     name: "",
     description: "",
     price: "",
-    originalPrice: "",
+    original_price: "",
     category: "",
-    discount: "",
     duration: "",
     location: "",
     available: true
   })
-  const [images, setImages] = useState<string[]>([])
-  const fileInputRefs = useRef<(HTMLInputElement | null)[]>([])
+  const [imageFiles, setImageFiles] = useState<(File | null)[]>([null, null, null, null])
+  const [imagePreviews, setImagePreviews] = useState<(string | null)[]>([null, null, null, null])
+  const [loading, setLoading] = useState(false)
+  const fileInputRefs = useRef<(HTMLInputElement | null)[]>([null, null, null, null])
 
   // Load service data when editing
   useEffect(() => {
@@ -43,34 +45,49 @@ export default function AddServiceDialog({ isOpen, onClose, onSave, editService 
       setFormData({
         name: editService.name || "",
         description: editService.description || "",
-        price: editService.price.replace("$", "") || "",
-        originalPrice: editService.originalPrice.replace("$", "") || "",
+        price: editService.price?.toString() || "",
+        original_price: editService.original_price?.toString() || "",
         category: editService.category || "",
-        discount: editService.discount || "",
         duration: editService.duration || "",
         location: editService.location || "",
         available: editService.available !== false
       })
-      setImages(editService.image ? [editService.image] : [])
+      
+      // Load existing images
+      if (editService.images && Array.isArray(editService.images)) {
+        const previews = [...imagePreviews]
+        editService.images.forEach((url: string, index: number) => {
+          if (index < 4) previews[index] = url
+        })
+        setImagePreviews(previews)
+      } else if (editService.image_url) {
+        setImagePreviews([editService.image_url, null, null, null])
+      }
+      
+      setImageFiles([null, null, null, null])
     } else if (!editService && isOpen) {
       // Reset form when adding new service
-      setFormData({
-        name: "",
-        description: "",
-        price: "",
-        originalPrice: "",
-        category: "",
-        discount: "",
-        duration: "",
-        location: "",
-        available: true
-      })
-      setImages([])
-      fileInputRefs.current.forEach(ref => {
-        if (ref) ref.value = ""
-      })
+      resetForm()
     }
   }, [editService, isOpen])
+
+  const resetForm = () => {
+    setFormData({
+      name: "",
+      description: "",
+      price: "",
+      original_price: "",
+      category: "",
+      duration: "",
+      location: "",
+      available: true
+    })
+    setImageFiles([null, null, null, null])
+    setImagePreviews([null, null, null, null])
+    fileInputRefs.current.forEach(ref => {
+      if (ref) ref.value = ""
+    })
+  }
 
   const handleImageUpload = (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -86,25 +103,35 @@ export default function AddServiceDialog({ isOpen, onClose, onSave, editService 
       return
     }
 
+    const newFiles = [...imageFiles]
+    newFiles[index] = file
+    setImageFiles(newFiles)
+    
+    // Create preview
     const reader = new FileReader()
     reader.onloadend = () => {
-      const base64String = reader.result as string
-      const newImages = [...images]
-      newImages[index] = base64String
-      setImages(newImages)
+      const newPreviews = [...imagePreviews]
+      newPreviews[index] = reader.result as string
+      setImagePreviews(newPreviews)
     }
     reader.readAsDataURL(file)
   }
 
   const removeImage = (index: number) => {
-    const newImages = images.filter((_, i) => i !== index)
-    setImages(newImages)
+    const newFiles = [...imageFiles]
+    newFiles[index] = null
+    setImageFiles(newFiles)
+    
+    const newPreviews = [...imagePreviews]
+    newPreviews[index] = null
+    setImagePreviews(newPreviews)
+    
     if (fileInputRefs.current[index]) {
       fileInputRefs.current[index]!.value = ""
     }
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
     if (!formData.name || !formData.price || !formData.category) {
@@ -112,64 +139,68 @@ export default function AddServiceDialog({ isOpen, onClose, onSave, editService 
       return
     }
 
-    if (images.length === 0 && !editService) {
-      alert("Please upload at least one image")
+    // Check if at least one image is provided
+    const hasImage = imagePreviews.some(preview => preview !== null)
+    if (!hasImage && !editService) {
+      alert("Please upload at least one service image")
       return
     }
 
-    // Calculate discount percentage if both prices are provided
-    let discount = formData.discount
-    if (formData.originalPrice && formData.price) {
-      const original = parseFloat(formData.originalPrice.replace("$", ""))
-      const sale = parseFloat(formData.price.replace("$", ""))
-      if (original > sale) {
-        const discountPercent = Math.round(((original - sale) / original) * 100)
-        discount = `${discountPercent}% OFF`
-      }
+    if (!storeId) {
+      alert("Store ID is missing")
+      return
     }
 
-    onSave({
-      name: formData.name,
-      description: formData.description,
-      price: formData.price.startsWith("$") ? formData.price : `$${formData.price}`,
-      originalPrice: formData.originalPrice || formData.price,
-      category: formData.category,
-      image: images[0], // Use first image as main image
-      discount: discount || "",
-      description: formData.description,
-      duration: formData.duration || undefined,
-      location: formData.location || undefined,
-      available: formData.available
-    })
+    setLoading(true)
 
-    // Reset form
-    setFormData({
-      name: "",
-      description: "",
-      price: "",
-      originalPrice: "",
-      category: "",
-      discount: "",
-      duration: "",
-      location: "",
-      available: true
-    })
-    setImages([])
-    fileInputRefs.current.forEach(ref => {
-      if (ref) ref.value = ""
-    })
-    onClose()
+    try {
+      const serviceData = {
+        name: formData.name,
+        description: formData.description,
+        price: parseFloat(formData.price),
+        original_price: formData.original_price ? parseFloat(formData.original_price) : parseFloat(formData.price),
+        category: formData.category,
+        duration: formData.duration,
+        location: formData.location,
+        available: formData.available
+      }
+
+      // Get only the files that were uploaded (not null)
+      const filesToUpload = imageFiles.filter((file): file is File => file !== null)
+
+      if (editService) {
+        // Update existing service - only upload new files
+        if (filesToUpload.length > 0) {
+          await updateService(editService.id, serviceData, filesToUpload, storeId)
+        } else {
+          // No new images, just update data
+          await updateService(editService.id, serviceData, undefined, storeId)
+        }
+      } else {
+        // Create new service
+        await createService(storeId, serviceData, filesToUpload)
+      }
+
+      resetForm()
+      onSave() // Reload services
+      onClose()
+    } catch (error: any) {
+      console.error("Error saving service:", error)
+      alert(`Failed to save service: ${error.message || "Please try again."}`)
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-2xl bg-white max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-3xl bg-white max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold text-gray-900">
             {editService ? "Edit Service" : "Add New Service"}
           </DialogTitle>
           <DialogDescription className="text-gray-600">
-            {editService ? "Update the service details and images" : "Fill in the service details and upload images"}
+            {editService ? "Update the service details and images" : "Fill in the service details and upload images (up to 4)"}
           </DialogDescription>
         </DialogHeader>
 
@@ -205,30 +236,34 @@ export default function AddServiceDialog({ isOpen, onClose, onSave, editService 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <label htmlFor="price" className="text-sm font-semibold text-gray-900">
-                Sale Price *
+                Service Price *
               </label>
               <Input
                 id="price"
-                type="text"
+                type="number"
+                step="0.01"
+                min="0"
                 value={formData.price}
                 onChange={(e) => setFormData({ ...formData, price: e.target.value })}
                 required
                 className="bg-white border-gray-200 text-gray-900"
-                placeholder="$99.99"
+                placeholder="99.99"
               />
             </div>
 
             <div className="space-y-2">
-              <label htmlFor="originalPrice" className="text-sm font-semibold text-gray-900">
+              <label htmlFor="original_price" className="text-sm font-semibold text-gray-900">
                 Original Price
               </label>
               <Input
-                id="originalPrice"
-                type="text"
-                value={formData.originalPrice}
-                onChange={(e) => setFormData({ ...formData, originalPrice: e.target.value })}
+                id="original_price"
+                type="number"
+                step="0.01"
+                min="0"
+                value={formData.original_price}
+                onChange={(e) => setFormData({ ...formData, original_price: e.target.value })}
                 className="bg-white border-gray-200 text-gray-900"
-                placeholder="$129.99"
+                placeholder="129.99"
               />
             </div>
           </div>
@@ -243,7 +278,7 @@ export default function AddServiceDialog({ isOpen, onClose, onSave, editService 
                 value={formData.duration}
                 onChange={(e) => setFormData({ ...formData, duration: e.target.value })}
                 className="bg-white border-gray-200 text-gray-900"
-                placeholder="e.g., 2 hours, 1 day"
+                placeholder="e.g. 1 hour, 30 minutes"
               />
             </div>
 
@@ -259,6 +294,19 @@ export default function AddServiceDialog({ isOpen, onClose, onSave, editService 
                 placeholder="Service location"
               />
             </div>
+          </div>
+
+          <div className="flex items-center space-x-2">
+            <input
+              type="checkbox"
+              id="available"
+              checked={formData.available}
+              onChange={(e) => setFormData({ ...formData, available: e.target.checked })}
+              className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary"
+            />
+            <label htmlFor="available" className="text-sm font-semibold text-gray-900">
+              Available for booking
+            </label>
           </div>
 
           <div className="space-y-2">
@@ -281,30 +329,17 @@ export default function AddServiceDialog({ isOpen, onClose, onSave, editService 
             </select>
           </div>
 
-          <div className="flex items-center space-x-2">
-            <input
-              type="checkbox"
-              id="available"
-              checked={formData.available}
-              onChange={(e) => setFormData({ ...formData, available: e.target.checked })}
-              className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary"
-            />
-            <label htmlFor="available" className="text-sm font-semibold text-gray-900">
-              Available for booking
-            </label>
-          </div>
-
           <div className="space-y-2">
             <label className="text-sm font-semibold text-gray-900">
-              Service Images * (Upload up to 5 images)
+              Service Images * (Upload up to 4 images)
             </label>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-              {[0, 1, 2, 3, 4].map((index) => (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {[0, 1, 2, 3].map((index) => (
                 <div key={index} className="relative">
-                  {images[index] ? (
+                  {imagePreviews[index] ? (
                     <div className="relative aspect-square">
                       <img
-                        src={images[index]}
+                        src={imagePreviews[index]!}
                         alt={`Service ${index + 1}`}
                         className="w-full h-full object-cover rounded-lg border border-gray-200"
                       />
@@ -315,6 +350,11 @@ export default function AddServiceDialog({ isOpen, onClose, onSave, editService 
                       >
                         <X className="h-3 w-3" />
                       </button>
+                      {index === 0 && (
+                        <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-60 text-white text-xs py-1 text-center rounded-b-lg">
+                          Main Image
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div className="aspect-square border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center hover:border-gray-400 transition-colors">
@@ -330,8 +370,10 @@ export default function AddServiceDialog({ isOpen, onClose, onSave, editService 
                         htmlFor={`service-image-${index}`}
                         className="cursor-pointer flex flex-col items-center justify-center p-2 text-gray-500 hover:text-gray-700"
                       >
-                        <Upload className="h-6 w-6 mb-1" />
-                        <span className="text-xs text-center">Image {index + 1}</span>
+                        <Upload className="h-8 w-8 mb-1" />
+                        <span className="text-xs text-center">
+                          {index === 0 ? "Main Image" : `Image ${index + 1}`}
+                        </span>
                       </label>
                     </div>
                   )}
@@ -347,16 +389,21 @@ export default function AddServiceDialog({ isOpen, onClose, onSave, editService 
             <Button
               type="button"
               variant="outline"
-              onClick={onClose}
+              onClick={() => {
+                resetForm()
+                onClose()
+              }}
+              disabled={loading}
               className="border-2 border-gray-300 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-400"
             >
               Cancel
             </Button>
             <Button
               type="submit"
-              className="border-2 border-gray-300 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-400"
+              disabled={loading}
+              className="border-2 border-gray-300 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-400 disabled:opacity-50"
             >
-              {editService ? "Update Service" : "Add Service"}
+              {loading ? "Saving..." : editService ? "Update Service" : "Add Service"}
             </Button>
           </DialogFooter>
         </form>
@@ -364,4 +411,3 @@ export default function AddServiceDialog({ isOpen, onClose, onSave, editService 
     </Dialog>
   )
 }
-

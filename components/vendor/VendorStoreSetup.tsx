@@ -60,6 +60,13 @@ export default function VendorStoreSetup() {
     }
 
     const vendorStore = getStoreByVendorId(vendor.id)
+    
+    // Check if store is suspended
+    if (vendorStore?.status === "suspended") {
+      router.push("/vendor")
+      return
+    }
+    
     if (!vendorStore) {
       // Create store if doesn't exist
       const store = {
@@ -144,7 +151,7 @@ export default function VendorStoreSetup() {
     
     setTimeout(() => {
       setSaving(false)
-      router.push("/vendor")
+      router.push("/vendor/dashboard")
     }, 500)
   }
 

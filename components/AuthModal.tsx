@@ -1,7 +1,8 @@
 "use client"
 
 import { useState } from "react"
-import { X, Mail, Lock, User, Store } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { Mail, Lock, User, Store, AlertCircle, Eye, EyeOff, CheckCircle } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -11,6 +12,9 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { signUp, signIn } from "@/lib/api/auth"
+import { createVendor, createStore } from "@/lib/api/vendors"
+import { getCurrentUser } from "@/lib/api/auth"
 
 interface AuthModalProps {
   isOpen: boolean
@@ -20,93 +24,178 @@ interface AuthModalProps {
 type AuthMode = "signin" | "signup" | "signup-vendor"
 
 export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
+  const router = useRouter()
   const [mode, setMode] = useState<AuthMode>("signin")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [name, setName] = useState("")
   const [vendorName, setVendorName] = useState("")
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [showPassword, setShowPassword] = useState(false)
+  const [emailSent, setEmailSent] = useState(false)
+  const [signupEmail, setSignupEmail] = useState("")
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
+    setError(null)
 
-    // Simulate API call
-    setTimeout(() => {
-      console.log("Auth submitted:", { mode, email, password, name, vendorName })
-      
-      // Save auth data to localStorage
-      const authData = {
-        email,
-        name: mode !== "signin" ? name : undefined,
-        vendorName: mode === "signup-vendor" ? vendorName : undefined,
-        role: mode === "signup-vendor" ? "vendor" : "user",
-        isLoggedIn: true
-      }
-      localStorage.setItem("auth", JSON.stringify(authData))
-      
-      // If vendor signup, create vendor and store request
-      if (mode === "signup-vendor" && vendorName) {
-        const { saveVendor, saveStore } = require("@/lib/vendor-data")
-        const vendorId = `vendor-${Date.now()}`
-        const vendor = {
-          id: vendorId,
-          email,
-          name,
-          vendorName,
-          role: "vendor" as const,
-          createdAt: new Date().toISOString()
-        }
-        saveVendor(vendor)
+    try {
+      if (mode === "signin") {
+        // Sign in
+        const { user } = await signIn({ email, password })
         
-        // Create store with pending status
-        const store = {
-          id: `store-${Date.now()}`,
-          vendorId,
-          name: vendorName,
-          status: "pending" as const,
-          createdAt: new Date().toISOString()
+        if (user) {
+          // Dispatch event to update header
+          window.dispatchEvent(new Event("authUpdated"))
+          onClose()
+          resetForm()
+          
+          // Check user role and redirect accordingly
+          const { getCurrentUserWithProfile } = await import("@/lib/api/auth")
+          try {
+            const userProfile = await getCurrentUserWithProfile()
+            if (userProfile?.role === "admin") {
+              // Redirect admin to admin dashboard
+              router.push("/admin")
+            } else if (userProfile?.role === "vendor") {
+              // Check store status for vendors
+              const { getVendorByUserId, getStoreByVendorId } = await import("@/lib/api/vendors")
+              const vendor = await getVendorByUserId(user.id)
+              if (vendor) {
+                const store = await getStoreByVendorId(vendor.id)
+                if (!store || store.status === "pending" || store.status === "rejected") {
+                  router.push("/vendor/register-store")
+                } else {
+                  router.push("/vendor")
+                }
+              } else {
+                router.push("/vendor/register-store")
+              }
+            } else {
+              router.push("/marketplace")
+            }
+          } catch {
+            router.push("/marketplace")
+          }
         }
-        saveStore(store)
+      } else if (mode === "signup") {
+        // User sign up
+        const { user, needsEmailConfirmation } = await signUp({
+          email,
+          password,
+          name,
+          role: "user"
+        })
+        
+        if (user) {
+          if (needsEmailConfirmation) {
+            // Show email confirmation message
+            setEmailSent(true)
+            setSignupEmail(email)
+            resetForm()
+          } else {
+            window.dispatchEvent(new Event("authUpdated"))
+            onClose()
+            resetForm()
+            router.push("/profile")
+          }
+        }
+      } else if (mode === "signup-vendor") {
+        // Vendor sign up
+        if (!vendorName.trim()) {
+          setError("Business/Vendor name is required")
+          setLoading(false)
+          return
+        }
+
+        // Create user account
+        const { user, needsEmailConfirmation } = await signUp({
+          email,
+          password,
+          name,
+          role: "vendor",
+          vendor_name: vendorName
+        })
+
+        if (!user) {
+          throw new Error("Failed to create user account")
+        }
+
+        if (needsEmailConfirmation) {
+          // Show email confirmation message
+          // Vendor profile will be created after email confirmation via trigger
+          setEmailSent(true)
+          setSignupEmail(email)
+          resetForm()
+        } else {
+          // Email confirmation disabled - create vendor immediately
+          try {
+            // Create vendor profile
+            const vendor = await createVendor(user.id, {
+              vendor_name: vendorName,
+              email: email,
+              business_name: vendorName
+            })
+
+            // Create store with pending status
+            await createStore(vendor.id, {
+              name: vendorName,
+              description: `Store for ${vendorName}`
+            })
+
+            window.dispatchEvent(new Event("authUpdated"))
+            onClose()
+            resetForm()
+            // Redirect to store registration page
+            router.push("/vendor/register-store")
+          } catch (vendorError: any) {
+            // If vendor creation fails, still show email confirmation
+            // Vendor can be created after email confirmation
+            console.warn("Vendor creation failed, will be created after email confirmation:", vendorError)
+            setEmailSent(true)
+            setSignupEmail(email)
+            resetForm()
+          }
+        }
       }
-      
-      // Dispatch event to update header
-      window.dispatchEvent(new Event("authUpdated"))
-      
+    } catch (err: any) {
+      console.error("Auth error:", err)
+      setError(err.message || "An error occurred. Please try again.")
+    } finally {
       setLoading(false)
-      // Close the modal
-      onClose()
-      // Reset form
-      setEmail("")
-      setPassword("")
-      setName("")
-      setVendorName("")
-      setMode("signin")
-    }, 1000)
+    }
+  }
+
+  const resetForm = () => {
+    setEmail("")
+    setPassword("")
+    setName("")
+    setVendorName("")
+    setError(null)
+    setShowPassword(false)
+  }
+
+  const handleCloseEmailSent = () => {
+    setEmailSent(false)
+    setSignupEmail("")
+    onClose()
   }
 
   const switchToSignIn = () => {
     setMode("signin")
-    setEmail("")
-    setPassword("")
-    setName("")
-    setVendorName("")
+    resetForm()
   }
 
   const switchToSignUp = () => {
     setMode("signup")
-    setEmail("")
-    setPassword("")
-    setName("")
-    setVendorName("")
+    resetForm()
   }
 
   const switchToVendorSignUp = () => {
     setMode("signup-vendor")
-    setEmail("")
-    setPassword("")
-    setName("")
-    setVendorName("")
+    resetForm()
   }
 
   return (
@@ -126,6 +215,13 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-red-600" />
+              <p className="text-sm text-red-600">{error}</p>
+            </div>
+          )}
+          
           {(mode === "signup" || mode === "signup-vendor") && (
             <div className="space-y-2">
               <label htmlFor="name" className="text-sm font-semibold text-gray-900">
@@ -192,13 +288,24 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
               <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
               <Input
                 id="password"
-                type="password"
+                type={showPassword ? "text" : "password"}
                 placeholder="Enter your password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="pl-10"
+                className="pl-10 pr-10"
                 required
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                {showPassword ? (
+                  <EyeOff className="h-5 w-5" />
+                ) : (
+                  <Eye className="h-5 w-5" />
+                )}
+              </button>
             </div>
           </div>
 
@@ -224,7 +331,34 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
           </Button>
         </form>
 
+        {/* Email Confirmation Message */}
+        {emailSent && (
+          <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+            <div className="flex items-start gap-3">
+              <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <h3 className="text-sm font-semibold text-green-900 mb-1">
+                  Check your email
+                </h3>
+                <p className="text-sm text-green-800 mb-3">
+                  We've sent a confirmation email to <strong>{signupEmail}</strong>. 
+                  Please check your inbox and click the confirmation link to activate your account.
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleCloseEmailSent}
+                  className="w-full border-green-300 text-green-700 hover:bg-green-100"
+                >
+                  Got it
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Mode Switcher */}
+        {!emailSent && (
         <div className="mt-6 pt-6 border-t border-gray-200">
           {mode === "signin" ? (
             <div className="space-y-3">
@@ -305,6 +439,7 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
             </div>
           )}
         </div>
+        )}
       </DialogContent>
     </Dialog>
   )

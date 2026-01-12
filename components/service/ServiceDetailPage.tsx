@@ -1,38 +1,67 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { ArrowLeft, Star, ShoppingCart, Heart, Share2, Gift, Clock, MapPin } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
-import { allServices, getServiceById } from "@/lib/constants"
-import type { Service } from "@/types"
+import { getService } from "@/lib/api/products"
+import { useToast } from "@/components/ui/toast"
 
 export default function ServiceDetailPage({ serviceId }: { serviceId: string }) {
   const router = useRouter()
+  const { showToast } = useToast()
   const [quantity, setQuantity] = useState(1)
   const [selectedImageIndex, setSelectedImageIndex] = useState(0)
-  
-  // Find service by ID using centralized data
-  const serviceIdNum = serviceId ? parseInt(serviceId) : NaN
-  const service = !isNaN(serviceIdNum) ? getServiceById(serviceIdNum) : undefined
+  const [service, setService] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  // Generate image gallery - main image + 4 variations/angles
-  const serviceImages = service ? [
-    service.image,
-    service.image.replace('?w=300&h=300&fit=crop', '?w=600&h=600&fit=crop'),
-    service.image.replace('?w=300&h=300&fit=crop', '?w=600&h=600&fit=crop&q=80'),
-    service.image.replace('?w=300&h=300&fit=crop', '?w=600&h=600&fit=crop&q=90'),
-    service.image.replace('?w=300&h=300&fit=crop', '?w=600&h=600&fit=crop&q=85'),
-  ] : []
+  useEffect(() => {
+    async function fetchService() {
+      try {
+        setLoading(true)
+        const data = await getService(serviceId)
+        setService(data)
+      } catch (err: any) {
+        console.error('Error fetching service:', err)
+        setError(err.message || 'Failed to load service')
+      } finally {
+        setLoading(false)
+      }
+    }
 
-  if (!service) {
+    if (serviceId) {
+      fetchService()
+    }
+  }, [serviceId])
+
+  // Get service images from the images array or fallback to image_url
+  const serviceImages = service?.images && service.images.length > 0 
+    ? service.images 
+    : service?.image_url 
+    ? [service.image_url] 
+    : []
+
+  if (loading) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
         <Card className="border-2 border-gray-100">
           <CardContent className="p-12 text-center">
-            <p className="text-gray-600 text-lg mb-4">Service not found</p>
+            <p className="text-gray-600 text-lg">Loading service...</p>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  if (error || !service) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <Card className="border-2 border-gray-100">
+          <CardContent className="p-12 text-center">
+            <p className="text-gray-600 text-lg mb-4">{error || 'Service not found'}</p>
             <Button 
               variant="outline"
               className="border-2 border-gray-300 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-400 font-medium"
@@ -49,7 +78,14 @@ export default function ServiceDetailPage({ serviceId }: { serviceId: string }) 
 
   const handleAddToCart = () => {
     const cartItem = {
-      ...service,
+      id: service.id,
+      name: service.name,
+      price: typeof service.price === 'number' ? `$${service.price}` : service.price,
+      image: service.image_url,
+      store_id: service.store_id,
+      type: 'service',
+      duration: service.duration,
+      location: service.location,
       quantity
     }
     
@@ -57,7 +93,7 @@ export default function ServiceDetailPage({ serviceId }: { serviceId: string }) 
     const existingCart = JSON.parse(localStorage.getItem("cart") || "[]")
     
     // Check if service already exists in cart
-    const existingItemIndex = existingCart.findIndex((item: Service & { quantity: number }) => item.id === service.id)
+    const existingItemIndex = existingCart.findIndex((item: any) => item.id === service.id && item.type === 'service')
     
     if (existingItemIndex >= 0) {
       // Update quantity if already in cart
@@ -72,31 +108,16 @@ export default function ServiceDetailPage({ serviceId }: { serviceId: string }) 
     // Dispatch event to update cart count in header
     window.dispatchEvent(new Event("cartUpdated"))
     
-    // Show success message (in real app, use toast)
-    alert(`Added ${quantity} service(s) to cart!`)
+    // Show success message
+    showToast(`Added ${quantity} ${quantity > 1 ? 'services' : 'service'} to cart!`, "success")
   }
 
   const handleSendGift = () => {
     // Add service to cart first
-    const cartItem = {
-      ...service,
-      quantity
-    }
-    
-    const existingCart = JSON.parse(localStorage.getItem("cart") || "[]")
-    const existingItemIndex = existingCart.findIndex((item: Service & { quantity: number }) => item.id === service.id)
-    
-    if (existingItemIndex >= 0) {
-      existingCart[existingItemIndex].quantity += quantity
-    } else {
-      existingCart.push(cartItem)
-    }
-    
-    localStorage.setItem("cart", JSON.stringify(existingCart))
-    window.dispatchEvent(new Event("cartUpdated"))
+    handleAddToCart()
     
     // Navigate to gift page
-    router.push(`/send-gift?service=${encodeURIComponent(JSON.stringify(service))}`)
+    router.push(`/send-gift?serviceId=${service.id}&type=service`)
   }
 
   return (
@@ -117,38 +138,50 @@ export default function ServiceDetailPage({ serviceId }: { serviceId: string }) 
           <div className="space-y-4">
             {/* Main Image */}
             <div className="relative aspect-square rounded-lg overflow-hidden border-2 border-gray-200 bg-gray-50">
-              <img
-                src={serviceImages[selectedImageIndex]}
-                alt={service.name}
-                className="w-full h-full object-cover"
-                loading="eager"
-              />
-              <Badge className="absolute top-4 left-4 bg-secondary text-gray-900 font-semibold shadow-md">
-                {service.discount}
-              </Badge>
+              {serviceImages.length > 0 ? (
+                <>
+                  <img
+                    src={serviceImages[selectedImageIndex]}
+                    alt={service.name}
+                    className="w-full h-full object-cover"
+                    loading="eager"
+                  />
+                  {service.original_price && service.original_price > service.price && (
+                    <Badge className="absolute top-4 left-4 bg-red-500 text-white font-semibold shadow-md">
+                      {Math.round((1 - service.price / service.original_price) * 100)}% OFF
+                    </Badge>
+                  )}
+                </>
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-gray-400">
+                  No image available
+                </div>
+              )}
             </div>
             
             {/* Thumbnail Images */}
-            <div className="grid grid-cols-4 gap-3">
-              {serviceImages.slice(0, 4).map((image, index) => (
-                <button
-                  key={index}
-                  onClick={() => setSelectedImageIndex(index)}
-                  className={`relative aspect-square rounded-lg overflow-hidden border-2 transition-all ${
-                    selectedImageIndex === index
-                      ? "border-primary ring-2 ring-primary/20"
-                      : "border-gray-200 hover:border-gray-300"
-                  } bg-gray-50`}
-                >
-                  <img
-                    src={image}
-                    alt={`${service.name} view ${index + 1}`}
-                    className="w-full h-full object-cover"
-                    loading="lazy"
-                  />
-                </button>
-              ))}
-            </div>
+            {serviceImages.length > 1 && (
+              <div className="grid grid-cols-4 gap-3">
+                {serviceImages.map((image, index) => (
+                  <button
+                    key={index}
+                    onClick={() => setSelectedImageIndex(index)}
+                    className={`relative aspect-square rounded-lg overflow-hidden border-2 transition-all ${
+                      selectedImageIndex === index
+                        ? "border-primary ring-2 ring-primary/20"
+                        : "border-gray-200 hover:border-gray-300"
+                    } bg-gray-50`}
+                  >
+                    <img
+                      src={image}
+                      alt={`${service.name} view ${index + 1}`}
+                      className="w-full h-full object-cover"
+                      loading="lazy"
+                    />
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Service Details */}
@@ -159,16 +192,10 @@ export default function ServiceDetailPage({ serviceId }: { serviceId: string }) 
               </Badge>
               <h1 className="text-4xl font-semibold text-gray-800 mb-4">{service.name}</h1>
               
-              <div className="flex items-center space-x-4 mb-4">
-                <div className="flex items-center">
-                  <Star className="h-5 w-5 fill-yellow-400 text-yellow-400 mr-1" />
-                  <span className="font-medium text-gray-700">{service.rating}</span>
-                  <span className="text-gray-500 ml-2">({service.reviews} reviews)</span>
-                </div>
-              </div>
-
               <p className="text-gray-500 mb-4">
-                by <span className="font-medium text-gray-700">{service.vendor}</span>
+                by <span className="font-medium text-gray-700">
+                  {service.stores?.vendors?.vendor_name || service.stores?.name || 'Unknown Vendor'}
+                </span>
               </p>
 
               {/* Service Specific Info */}
@@ -200,8 +227,15 @@ export default function ServiceDetailPage({ serviceId }: { serviceId: string }) 
             {/* Price */}
             <div className="border-t border-b border-gray-200 py-6 bg-gray-50/30">
               <div className="flex items-baseline space-x-4">
-                <span className="text-4xl font-semibold text-primary">{service.price}</span>
-                <span className="text-xl text-gray-400 line-through">{service.originalPrice}</span>
+                <span className="text-4xl font-semibold text-primary">${service.price.toFixed(2)}</span>
+                {service.original_price && service.original_price > service.price && (
+                  <>
+                    <span className="text-xl text-gray-400 line-through">${service.original_price.toFixed(2)}</span>
+                    <Badge className="bg-red-500 text-white">
+                      {Math.round((1 - service.price / service.original_price) * 100)}% OFF
+                    </Badge>
+                  </>
+                )}
               </div>
             </div>
 
@@ -281,8 +315,14 @@ export default function ServiceDetailPage({ serviceId }: { serviceId: string }) 
                     <span className="font-medium text-gray-700">{service.category}</span>
                   </div>
                   <div className="flex justify-between">
+                    <span className="text-gray-500">Store</span>
+                    <span className="font-medium text-gray-700">{service.stores?.name || 'N/A'}</span>
+                  </div>
+                  <div className="flex justify-between">
                     <span className="text-gray-500">Vendor</span>
-                    <span className="font-medium text-gray-700">{service.vendor}</span>
+                    <span className="font-medium text-gray-700">
+                      {service.stores?.vendors?.vendor_name || 'N/A'}
+                    </span>
                   </div>
                   {service.duration && (
                     <div className="flex justify-between">
@@ -297,12 +337,10 @@ export default function ServiceDetailPage({ serviceId }: { serviceId: string }) 
                     </div>
                   )}
                   <div className="flex justify-between">
-                    <span className="text-gray-500">Rating</span>
-                    <span className="font-medium text-gray-700">{service.rating} / 5.0</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Reviews</span>
-                    <span className="font-medium text-gray-700">{service.reviews}</span>
+                    <span className="text-gray-500">Availability</span>
+                    <span className="font-medium text-gray-700">
+                      {service.available ? 'Available' : 'Not Available'}
+                    </span>
                   </div>
                 </div>
               </CardContent>

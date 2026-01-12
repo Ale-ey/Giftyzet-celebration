@@ -1,38 +1,67 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { ArrowLeft, Star, ShoppingCart, Heart, Share2, Gift } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
-import { allProducts, getProductById } from "@/lib/constants"
-import type { Product } from "@/types"
+import { getProduct } from "@/lib/api/products"
+import { useToast } from "@/components/ui/toast"
 
 export default function ProductDetailPage({ productId }: { productId: string }) {
   const router = useRouter()
+  const { showToast } = useToast()
   const [quantity, setQuantity] = useState(1)
   const [selectedImageIndex, setSelectedImageIndex] = useState(0)
-  
-  // Find product by ID using centralized data
-  const productIdNum = productId ? parseInt(productId) : NaN
-  const product = !isNaN(productIdNum) ? getProductById(productIdNum) : undefined
+  const [product, setProduct] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  // Generate image gallery - main image + 4 variations/angles
-  const productImages = product ? [
-    product.image,
-    product.image.replace('?w=300&h=300&fit=crop', '?w=600&h=600&fit=crop'),
-    product.image.replace('?w=300&h=300&fit=crop', '?w=600&h=600&fit=crop&q=80'),
-    product.image.replace('?w=300&h=300&fit=crop', '?w=600&h=600&fit=crop&q=90'),
-    product.image.replace('?w=300&h=300&fit=crop', '?w=600&h=600&fit=crop&q=85'),
-  ] : []
+  useEffect(() => {
+    async function fetchProduct() {
+      try {
+        setLoading(true)
+        const data = await getProduct(productId)
+        setProduct(data)
+      } catch (err: any) {
+        console.error('Error fetching product:', err)
+        setError(err.message || 'Failed to load product')
+      } finally {
+        setLoading(false)
+      }
+    }
 
-  if (!product) {
+    if (productId) {
+      fetchProduct()
+    }
+  }, [productId])
+
+  // Get product images from the images array or fallback to image_url
+  const productImages = product?.images && product.images.length > 0 
+    ? product.images 
+    : product?.image_url 
+    ? [product.image_url] 
+    : []
+
+  if (loading) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
         <Card className="border-2 border-gray-100">
           <CardContent className="p-12 text-center">
-            <p className="text-gray-600 text-lg mb-4">Product not found</p>
+            <p className="text-gray-600 text-lg">Loading product...</p>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  if (error || !product) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <Card className="border-2 border-gray-100">
+          <CardContent className="p-12 text-center">
+            <p className="text-gray-600 text-lg mb-4">{error || 'Product not found'}</p>
             <Button onClick={() => router.push("/marketplace")}>
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back to Marketplace
@@ -45,7 +74,12 @@ export default function ProductDetailPage({ productId }: { productId: string }) 
 
   const handleAddToCart = () => {
     const cartItem = {
-      ...product,
+      id: product.id,
+      name: product.name,
+      price: typeof product.price === 'number' ? `$${product.price}` : product.price,
+      image: product.image_url,
+      store_id: product.store_id,
+      type: 'product',
       quantity
     }
     
@@ -53,7 +87,7 @@ export default function ProductDetailPage({ productId }: { productId: string }) 
     const existingCart = JSON.parse(localStorage.getItem("cart") || "[]")
     
     // Check if product already exists in cart
-    const existingItemIndex = existingCart.findIndex((item: Product & { quantity: number }) => item.id === product.id)
+    const existingItemIndex = existingCart.findIndex((item: any) => item.id === product.id && item.type === 'product')
     
     if (existingItemIndex >= 0) {
       // Update quantity if already in cart
@@ -68,31 +102,16 @@ export default function ProductDetailPage({ productId }: { productId: string }) 
     // Dispatch event to update cart count in header
     window.dispatchEvent(new Event("cartUpdated"))
     
-    // Show success message (in real app, use toast)
-    alert(`Added ${quantity} item(s) to cart!`)
+    // Show success message
+    showToast(`Added ${quantity} ${quantity > 1 ? 'items' : 'item'} to cart!`, "success")
   }
 
   const handleSendGift = () => {
     // Add product to cart first
-    const cartItem = {
-      ...product,
-      quantity
-    }
-    
-    const existingCart = JSON.parse(localStorage.getItem("cart") || "[]")
-    const existingItemIndex = existingCart.findIndex((item: Product & { quantity: number }) => item.id === product.id)
-    
-    if (existingItemIndex >= 0) {
-      existingCart[existingItemIndex].quantity += quantity
-    } else {
-      existingCart.push(cartItem)
-    }
-    
-    localStorage.setItem("cart", JSON.stringify(existingCart))
-    window.dispatchEvent(new Event("cartUpdated"))
+    handleAddToCart()
     
     // Navigate to gift page
-    router.push(`/send-gift?product=${encodeURIComponent(JSON.stringify(product))}`)
+    router.push(`/send-gift?productId=${product.id}&type=product`)
   }
 
   return (
@@ -113,38 +132,50 @@ export default function ProductDetailPage({ productId }: { productId: string }) 
           <div className="space-y-4">
             {/* Main Image */}
             <div className="relative aspect-square rounded-lg overflow-hidden border-2 border-gray-200 bg-gray-50">
-              <img
-                src={productImages[selectedImageIndex]}
-                alt={product.name}
-                className="w-full h-full object-cover"
-                loading="eager"
-              />
-              <Badge className="absolute top-4 left-4 bg-secondary text-gray-900 font-semibold shadow-md">
-                {product.discount}
-              </Badge>
+              {productImages.length > 0 ? (
+                <>
+                  <img
+                    src={productImages[selectedImageIndex]}
+                    alt={product.name}
+                    className="w-full h-full object-cover"
+                    loading="eager"
+                  />
+                  {product.original_price && product.original_price > product.price && (
+                    <Badge className="absolute top-4 left-4 bg-red-500 text-white font-semibold shadow-md">
+                      {Math.round((1 - product.price / product.original_price) * 100)}% OFF
+                    </Badge>
+                  )}
+                </>
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-gray-400">
+                  No image available
+                </div>
+              )}
             </div>
             
             {/* Thumbnail Images */}
-            <div className="grid grid-cols-4 gap-3">
-              {productImages.slice(0, 4).map((image, index) => (
-                <button
-                  key={index}
-                  onClick={() => setSelectedImageIndex(index)}
-                  className={`relative aspect-square rounded-lg overflow-hidden border-2 transition-all ${
-                    selectedImageIndex === index
-                      ? "border-primary ring-2 ring-primary/20"
-                      : "border-gray-200 hover:border-gray-300"
-                  } bg-gray-50`}
-                >
-                  <img
-                    src={image}
-                    alt={`${product.name} view ${index + 1}`}
-                    className="w-full h-full object-cover"
-                    loading="lazy"
-                  />
-                </button>
-              ))}
-            </div>
+            {productImages.length > 1 && (
+              <div className="grid grid-cols-4 gap-3">
+                {productImages.map((image, index) => (
+                  <button
+                    key={index}
+                    onClick={() => setSelectedImageIndex(index)}
+                    className={`relative aspect-square rounded-lg overflow-hidden border-2 transition-all ${
+                      selectedImageIndex === index
+                        ? "border-primary ring-2 ring-primary/20"
+                        : "border-gray-200 hover:border-gray-300"
+                    } bg-gray-50`}
+                  >
+                    <img
+                      src={image}
+                      alt={`${product.name} view ${index + 1}`}
+                      className="w-full h-full object-cover"
+                      loading="lazy"
+                    />
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Product Details */}
@@ -155,16 +186,10 @@ export default function ProductDetailPage({ productId }: { productId: string }) 
               </Badge>
               <h1 className="text-4xl font-semibold text-gray-800 mb-4">{product.name}</h1>
               
-              <div className="flex items-center space-x-4 mb-4">
-                <div className="flex items-center">
-                  <Star className="h-5 w-5 fill-yellow-400 text-yellow-400 mr-1" />
-                  <span className="font-medium text-gray-700">{product.rating}</span>
-                  <span className="text-gray-500 ml-2">({product.reviews} reviews)</span>
-                </div>
-              </div>
-
               <p className="text-gray-500 mb-4">
-                by <span className="font-medium text-gray-700">{product.vendor}</span>
+                by <span className="font-medium text-gray-700">
+                  {product.stores?.vendors?.vendor_name || product.stores?.name || 'Unknown Vendor'}
+                </span>
               </p>
               
               {/* Product Description */}
@@ -180,8 +205,15 @@ export default function ProductDetailPage({ productId }: { productId: string }) 
             {/* Price */}
             <div className="border-t border-b border-gray-200 py-6 bg-gray-50/30">
               <div className="flex items-baseline space-x-4">
-                <span className="text-4xl font-semibold text-primary">{product.price}</span>
-                <span className="text-xl text-gray-400 line-through">{product.originalPrice}</span>
+                <span className="text-4xl font-semibold text-primary">${product.price.toFixed(2)}</span>
+                {product.original_price && product.original_price > product.price && (
+                  <>
+                    <span className="text-xl text-gray-400 line-through">${product.original_price.toFixed(2)}</span>
+                    <Badge className="bg-red-500 text-white">
+                      {Math.round((1 - product.price / product.original_price) * 100)}% OFF
+                    </Badge>
+                  </>
+                )}
               </div>
             </div>
 
@@ -261,17 +293,27 @@ export default function ProductDetailPage({ productId }: { productId: string }) 
                     <span className="font-medium text-gray-700">{product.category}</span>
                   </div>
                   <div className="flex justify-between">
+                    <span className="text-gray-500">Store</span>
+                    <span className="font-medium text-gray-700">{product.stores?.name || 'N/A'}</span>
+                  </div>
+                  <div className="flex justify-between">
                     <span className="text-gray-500">Vendor</span>
-                    <span className="font-medium text-gray-700">{product.vendor}</span>
+                    <span className="font-medium text-gray-700">
+                      {product.stores?.vendors?.vendor_name || 'N/A'}
+                    </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-500">Rating</span>
-                    <span className="font-medium text-gray-700">{product.rating} / 5.0</span>
+                    <span className="text-gray-500">Availability</span>
+                    <span className="font-medium text-gray-700">
+                      {product.available ? 'In Stock' : 'Out of Stock'}
+                    </span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Reviews</span>
-                    <span className="font-medium text-gray-700">{product.reviews}</span>
-                  </div>
+                  {product.stock && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Stock</span>
+                      <span className="font-medium text-gray-700">{product.stock} units</span>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>

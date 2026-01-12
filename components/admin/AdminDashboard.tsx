@@ -7,126 +7,146 @@ import {
   CheckCircle2, 
   XCircle, 
   Clock,
-  Users,
-  ShoppingBag,
-  AlertCircle
+  AlertCircle,
+  Ban
 } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { getCurrentUserWithProfile, getCurrentUser } from "@/lib/api/auth"
 import { 
-  getPendingStores, 
-  getApprovedStores, 
-  getStores, 
-  saveStore,
-  getOrders,
-  getVendors,
-  saveVendor
-} from "@/lib/vendor-data"
-import type { Store as StoreType, Order, Vendor } from "@/types"
+  getPendingStores as getApiPendingStores,
+  getAllApprovedStores,
+  getSuspendedStores as getApiSuspendedStores,
+  approveStore as apiApproveStore,
+  suspendStore as apiSuspendStore,
+  rejectStore as apiRejectStore
+} from "@/lib/api/vendors"
+import type { Order } from "@/types"
 
 export default function AdminDashboard() {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
-  const [pendingStores, setPendingStores] = useState<StoreType[]>([])
-  const [approvedStores, setApprovedStores] = useState<StoreType[]>([])
+  const [isAuthorized, setIsAuthorized] = useState(false)
+  const [pendingStores, setPendingStores] = useState<any[]>([])
+  const [approvedStores, setApprovedStores] = useState<any[]>([])
+  const [suspendedStores, setSuspendedStores] = useState<any[]>([])
   const [orders, setOrders] = useState<Order[]>([])
   const [currentPage, setCurrentPage] = useState(1)
+  const [actionLoading, setActionLoading] = useState<string | null>(null)
   const itemsPerPage = 6
 
   useEffect(() => {
     if (typeof window === "undefined") return
 
-    // Create demo store if none exists
-    const stores = getStores()
-    
-    if (stores.length === 0) {
-      // Create demo vendor
-      const vendors = getVendors()
-      let vendor = vendors[0]
-      
-      if (!vendor) {
-        const vendorId = `vendor-${Date.now()}`
-        vendor = {
-          id: vendorId,
-          email: "demo@vendor.com",
-          name: "Demo Vendor",
-          vendorName: "Demo Store",
-          role: "vendor" as const,
-          createdAt: new Date().toISOString()
+    // Check if user is admin
+    const checkAuth = async () => {
+      try {
+        const userProfile = await getCurrentUserWithProfile()
+        if (userProfile?.role === "admin") {
+          setIsAuthorized(true)
+        } else {
+          // Not an admin, redirect to home
+          router.push("/")
+          return
         }
-        saveVendor(vendor)
+      } catch (error) {
+        console.error("Auth check error:", error)
+        // Not logged in or error, redirect to home
+        router.push("/")
+        return
       }
-      
-      // Create demo store with approved status
-      const store = {
-        id: `store-${Date.now()}`,
-        vendorId: vendor.id,
-        name: "Demo Store",
-        status: "approved" as const,
-        createdAt: new Date().toISOString(),
-        approvedAt: new Date().toISOString()
-      }
-      saveStore(store)
     }
 
-    // Load data - no auth check for now
-    const pending = getPendingStores()
-    const approved = getApprovedStores()
-    const allOrders = getOrders()
-
-    setPendingStores(pending)
-    setApprovedStores(approved)
-    setOrders(allOrders)
-    setLoading(false)
-
-    // Listen for updates
-    const handleUpdate = () => {
-      setPendingStores(getPendingStores())
-      setApprovedStores(getApprovedStores())
-      setOrders(getOrders())
-    }
-
-    window.addEventListener("storesUpdated", handleUpdate)
-    window.addEventListener("ordersUpdated", handleUpdate)
-
-    return () => {
-      window.removeEventListener("storesUpdated", handleUpdate)
-      window.removeEventListener("ordersUpdated", handleUpdate)
-    }
+    checkAuth()
   }, [router])
 
-  const handleApproveStore = (storeId: string) => {
-    const stores = getStores()
-    const store = stores.find((s) => s.id === storeId)
-    if (store) {
-      const updatedStore: StoreType = {
-        ...store,
-        status: "approved",
-        approvedAt: new Date().toISOString()
-      }
-      saveStore(updatedStore)
-      setPendingStores(getPendingStores())
-      setApprovedStores(getApprovedStores())
+  useEffect(() => {
+    if (typeof window === "undefined" || !isAuthorized) return
+
+    loadStoresData()
+  }, [isAuthorized])
+
+  const loadStoresData = async () => {
+    try {
+      setLoading(true)
+      // Load data from Supabase
+      const [pending, approved, suspended] = await Promise.all([
+        getApiPendingStores(),
+        getAllApprovedStores(),
+        getApiSuspendedStores()
+      ])
+
+      setPendingStores(pending || [])
+      setApprovedStores(approved || [])
+      setSuspendedStores(suspended || [])
+      setOrders([]) // TODO: Load orders from Supabase
+    } catch (error) {
+      console.error("Error loading stores:", error)
+    } finally {
+      setLoading(false)
     }
   }
 
-  const handleSuspendStore = (storeId: string) => {
-    const stores = getStores()
-    const store = stores.find((s) => s.id === storeId)
-    if (store) {
-      const updatedStore: StoreType = {
-        ...store,
-        status: store.status === "suspended" ? "approved" : "suspended",
-        suspendedAt: store.status === "suspended" ? undefined : new Date().toISOString()
-      }
-      saveStore(updatedStore)
-      setPendingStores(getPendingStores())
-      setApprovedStores(getApprovedStores())
+  const handleApproveStore = async (storeId: string) => {
+    try {
+      setActionLoading(storeId)
+      const user = await getCurrentUser()
+      if (!user) return
+      
+      await apiApproveStore(storeId, user.id)
+      await loadStoresData() // Reload data
+    } catch (error) {
+      console.error("Error approving store:", error)
+      alert("Failed to approve store. Please try again.")
+    } finally {
+      setActionLoading(null)
     }
   }
 
-  if (loading) {
+  const handleRejectStore = async (storeId: string) => {
+    try {
+      setActionLoading(storeId)
+      await apiRejectStore(storeId)
+      await loadStoresData() // Reload data
+    } catch (error) {
+      console.error("Error rejecting store:", error)
+      alert("Failed to reject store. Please try again.")
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  const handleSuspendStore = async (storeId: string) => {
+    try {
+      setActionLoading(storeId)
+      await apiSuspendStore(storeId)
+      await loadStoresData() // Reload data
+    } catch (error) {
+      console.error("Error suspending store:", error)
+      alert("Failed to suspend store. Please try again.")
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  const handleReactivateStore = async (storeId: string) => {
+    try {
+      setActionLoading(storeId)
+      const user = await getCurrentUser()
+      if (!user) return
+      
+      await apiApproveStore(storeId, user.id)
+      await loadStoresData() // Reload data
+    } catch (error) {
+      console.error("Error reactivating store:", error)
+      alert("Failed to reactivate store. Please try again.")
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  if (!isAuthorized || loading) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="text-gray-600">Loading...</div>
@@ -134,8 +154,9 @@ export default function AdminDashboard() {
     )
   }
 
-  const totalStores = approvedStores.length
+  const totalStores = approvedStores.length + suspendedStores.length
   const pendingCount = pendingStores.length
+  const suspendedCount = suspendedStores.length
   const totalOrders = orders.length
   const pendingOrders = orders.filter((o) => o.status === "pending").length
 
@@ -217,7 +238,7 @@ export default function AdminDashboard() {
                       <div>
                         <CardTitle className="text-gray-900">{store.name}</CardTitle>
                         <CardDescription className="text-gray-600">
-                          Vendor ID: {store.vendorId}
+                      {store.vendors?.business_name || store.vendors?.vendor_name}
                         </CardDescription>
                         {store.category && (
                           <Badge className="mt-2 border-gray-200 bg-white text-gray-600">
@@ -235,21 +256,43 @@ export default function AdminDashboard() {
                     {store.description && (
                       <p className="text-gray-600 mb-4">{store.description}</p>
                     )}
+                    <div className="space-y-2 mb-4 text-sm">
+                      {(store.email || store.vendors?.email) && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Email:</span>
+                          <span className="text-gray-900 font-medium text-xs">{store.email || store.vendors?.email}</span>
+                        </div>
+                      )}
+                      {(store.phone || store.vendors?.phone) && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Phone:</span>
+                          <span className="text-gray-900 font-medium">{store.phone || store.vendors?.phone}</span>
+                        </div>
+                      )}
+                      {(store.address || store.vendors?.address) && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Address:</span>
+                          <span className="text-gray-900 font-medium text-right text-xs">{store.address || store.vendors?.address}</span>
+                        </div>
+                      )}
+                    </div>
                     <div className="flex gap-2">
                       <Button
                         onClick={() => handleApproveStore(store.id)}
-                        className="border-2 border-gray-300 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-400"
+                        disabled={actionLoading === store.id}
+                        className="flex-1 border-2 border-gray-300 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-400 disabled:opacity-50"
                       >
                         <CheckCircle2 className="h-4 w-4 mr-2" />
-                        Approve Store
+                        {actionLoading === store.id ? "..." : "Approve"}
                       </Button>
                       <Button
-                        onClick={() => handleSuspendStore(store.id)}
+                        onClick={() => handleRejectStore(store.id)}
+                        disabled={actionLoading === store.id}
                         variant="outline"
-                        className="border-2 border-gray-300 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-400 hover:text-red-600"
+                        className="flex-1 border-2 border-gray-300 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-400 hover:text-red-600 disabled:opacity-50"
                       >
                         <XCircle className="h-4 w-4 mr-2" />
-                        Reject
+                        {actionLoading === store.id ? "..." : "Reject"}
                       </Button>
                     </div>
                   </CardContent>
@@ -258,6 +301,61 @@ export default function AdminDashboard() {
             </div>
           )}
         </div>
+
+        {/* Suspended Stores */}
+        {suspendedStores.length > 0 && (
+          <div className="mb-8">
+            <h2 className="text-2xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+              <Ban className="h-6 w-6 text-red-600" />
+              Suspended Stores ({suspendedStores.length})
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {suspendedStores.map((store) => (
+                <Card key={store.id} className="border border-red-200 bg-red-50">
+                  <CardHeader>
+                    <div className="flex items-start justify-between">
+                      <CardTitle className="text-gray-900">{store.name}</CardTitle>
+                      <Badge className="bg-red-100 text-red-700 border-red-300">
+                        <Ban className="h-3 w-3 mr-1" />
+                        Suspended
+                      </Badge>
+                    </div>
+                    <CardDescription className="text-gray-600">
+                      {store.category || "No category"}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {store.description && (
+                      <p className="text-sm text-gray-600 mb-4 line-clamp-2">{store.description}</p>
+                    )}
+                    <div className="space-y-2 mb-4 text-sm">
+                      {(store.email || store.vendors?.email) && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Email:</span>
+                          <span className="text-gray-900 font-medium text-xs">{store.email || store.vendors?.email}</span>
+                        </div>
+                      )}
+                      {(store.phone || store.vendors?.phone) && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Phone:</span>
+                          <span className="text-gray-900 font-medium">{store.phone || store.vendors?.phone}</span>
+                        </div>
+                      )}
+                    </div>
+                    <Button
+                      onClick={() => handleReactivateStore(store.id)}
+                      disabled={actionLoading === store.id}
+                      className="w-full border-2 border-green-300 bg-white text-green-700 hover:bg-green-50 hover:border-green-400 disabled:opacity-50"
+                    >
+                      <CheckCircle2 className="h-4 w-4 mr-2" />
+                      {actionLoading === store.id ? "Reactivating..." : "Reactivate Store"}
+                    </Button>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Approved Stores */}
         <div>
@@ -300,12 +398,22 @@ export default function AdminDashboard() {
                       {store.description && (
                         <p className="text-sm text-gray-600 mb-4 line-clamp-2">{store.description}</p>
                       )}
+                      <div className="flex gap-2">
                       <Button
                         onClick={() => router.push(`/admin/store/${store.id}`)}
-                        className="w-full border-2 border-gray-300 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-400"
+                          className="flex-1 border-2 border-gray-300 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-400"
                       >
                         View Details
                       </Button>
+                        <Button
+                          onClick={() => handleSuspendStore(store.id)}
+                          disabled={actionLoading === store.id}
+                          variant="outline"
+                          className="border-2 border-orange-300 bg-white text-orange-600 hover:bg-orange-50 hover:border-orange-400 disabled:opacity-50"
+                        >
+                          <Ban className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </CardContent>
                   </Card>
                 ))}

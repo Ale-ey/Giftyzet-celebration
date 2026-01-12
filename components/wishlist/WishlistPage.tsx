@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { wishlistTypes } from "@/lib/constants"
-import { getProducts } from "@/lib/api/products"
+import { getApprovedProducts } from "@/lib/api/products"
 import {
   getWishlists,
   createWishlist,
@@ -94,7 +94,7 @@ export default function WishlistPage() {
 
   const loadProducts = async () => {
     try {
-      const data = await getProducts()
+      const data = await getApprovedProducts()
       setProducts(data || [])
     } catch (error: any) {
       console.error("Error loading products:", error)

@@ -96,20 +96,29 @@ export default function GiftReceiverPage() {
 
   if (error || (!order && !loading)) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-2xl font-semibold text-gray-900 mb-4">Gift not found</h2>
-          <p className="text-gray-600 mb-4">
-            {error || "This gift link is invalid or has expired."}
-          </p>
-        </div>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <Card className="max-w-md w-full bg-white border border-gray-200 shadow-sm">
+          <CardContent className="p-8 text-center">
+            <Gift className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+            <h2 className="text-2xl font-semibold text-gray-900 mb-4">Gift Not Found</h2>
+            <p className="text-gray-600 mb-6">
+              {error || "This gift link is invalid or has expired."}
+            </p>
+            <Button
+              onClick={() => router.push("/marketplace")}
+              className="bg-primary hover:bg-primary/90 text-white"
+            >
+              Browse Marketplace
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     )
   }
 
   if (!order) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
           <p className="text-gray-600">Loading gift details...</p>
@@ -120,12 +129,12 @@ export default function GiftReceiverPage() {
 
   if (submitted) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center p-4">
-        <Card className="max-w-md w-full border-2 border-green-500">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <Card className="max-w-md w-full bg-white border-2 border-green-500 shadow-lg">
           <CardContent className="p-8 text-center">
             <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Thank You!</h2>
-            <p className="text-gray-600 mb-4">
+            <p className="text-gray-600 mb-6">
               Your address has been confirmed. Your gift will be delivered soon!
             </p>
             <Button
@@ -142,12 +151,12 @@ export default function GiftReceiverPage() {
 
   if (rejected) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center p-4">
-        <Card className="max-w-md w-full border-2 border-red-500">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <Card className="max-w-md w-full bg-white border-2 border-red-500 shadow-lg">
           <CardContent className="p-8 text-center">
             <XCircle className="h-16 w-16 text-red-500 mx-auto mb-4" />
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Gift Rejected</h2>
-            <p className="text-gray-600 mb-4">
+            <p className="text-gray-600 mb-6">
               You have declined this gift. The sender has been notified.
             </p>
             <Button
@@ -163,7 +172,7 @@ export default function GiftReceiverPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white py-12 px-4">
+    <div className="min-h-screen bg-gray-50 py-12 px-4">
       <div className="max-w-2xl mx-auto">
         <div className="text-center mb-8">
           <Gift className="h-16 w-16 text-primary mx-auto mb-4" />
@@ -174,13 +183,13 @@ export default function GiftReceiverPage() {
         </div>
 
         {/* Sender Information Card */}
-        <Card className="border-2 border-blue-200 bg-blue-50 mb-6">
+        <Card className="bg-white border border-gray-200 shadow-sm mb-6">
           <CardContent className="p-6">
             <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
               <User className="h-5 w-5 mr-2 text-primary" />
               Sender Information
             </h2>
-            <div className="space-y-3 bg-white p-4 rounded-lg">
+            <div className="space-y-3 bg-gray-50 p-4 rounded-lg border border-gray-100">
               <div className="flex items-start">
                 <User className="h-5 w-5 text-gray-500 mr-3 mt-0.5" />
                 <div>
@@ -210,7 +219,7 @@ export default function GiftReceiverPage() {
           </CardContent>
         </Card>
 
-        <Card className="border-2 border-gray-200 mb-6">
+        <Card className="bg-white border border-gray-200 shadow-sm mb-6">
           <CardContent className="p-6">
             <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
               <Gift className="h-5 w-5 mr-2 text-primary" />
@@ -218,7 +227,7 @@ export default function GiftReceiverPage() {
             </h2>
             <div className="space-y-3 mb-6">
               {order.order_items?.map((item: any, idx: number) => (
-                <div key={idx} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                <div key={idx} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg border border-gray-100">
                   <div>
                     <p className="font-semibold text-gray-900">{item.name}</p>
                     <p className="text-sm text-gray-600">Quantity: {item.quantity || 1}</p>
@@ -236,11 +245,11 @@ export default function GiftReceiverPage() {
           </CardContent>
         </Card>
 
-        <Card className="border-2 border-gray-200">
+        <Card className="bg-white border border-gray-200 shadow-sm">
           <CardContent className="p-6">
             <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
-              <User className="h-5 w-5 mr-2" />
-              Your Information
+              <MapPin className="h-5 w-5 mr-2 text-green-600" />
+              Confirm Your Delivery Address
             </h2>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
@@ -251,7 +260,7 @@ export default function GiftReceiverPage() {
                   id="receiverName"
                   value={order.receiver_name || ""}
                   disabled
-                  className="bg-gray-50 text-gray-600"
+                  className="bg-gray-50 text-gray-600 border-gray-200"
                 />
               </div>
               <div className="space-y-2">
@@ -263,7 +272,7 @@ export default function GiftReceiverPage() {
                   type="email"
                   value={order.receiver_email || ""}
                   disabled
-                  className="bg-gray-50 text-gray-600"
+                  className="bg-gray-50 text-gray-600 border-gray-200"
                 />
               </div>
               {order.receiver_phone && (
@@ -277,7 +286,7 @@ export default function GiftReceiverPage() {
                     type="tel"
                     value={order.receiver_phone}
                     disabled
-                    className="bg-gray-50 text-gray-600"
+                    className="bg-gray-50 text-gray-600 border-gray-200"
                   />
                 </div>
               )}
@@ -292,15 +301,20 @@ export default function GiftReceiverPage() {
                   onChange={(e) => setReceiverAddress(e.target.value)}
                   required
                   rows={4}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-md bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary"
-                  placeholder="Enter your complete delivery address"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                  placeholder="Enter your complete delivery address&#10;Street, City, State, ZIP Code"
                 />
               </div>
-              <div className="flex flex-col sm:flex-row gap-3">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <p className="text-xs text-blue-800">
+                  <strong>Privacy Protected:</strong> Your address is kept private and will only be used for delivery.
+                </p>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-3 pt-2">
                 <Button
                   type="submit"
                   disabled={loading || !receiverAddress.trim()}
-                  className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                  className="flex-1 bg-green-600 hover:bg-green-700 text-white disabled:bg-gray-300 disabled:cursor-not-allowed"
                 >
                   {loading ? (
                     <>
@@ -310,7 +324,7 @@ export default function GiftReceiverPage() {
                   ) : (
                     <>
                       <CheckCircle className="h-4 w-4 mr-2" />
-                      Confirm & Accept
+                      Confirm & Accept Gift
                     </>
                   )}
                 </Button>
@@ -319,7 +333,7 @@ export default function GiftReceiverPage() {
                   onClick={handleReject}
                   disabled={loading}
                   variant="outline"
-                  className="flex-1 border-2 border-red-500 text-red-600 hover:bg-red-50"
+                  className="flex-1 border-2 border-red-500 text-red-600 hover:bg-red-50 bg-white"
                 >
                   <XCircle className="h-4 w-4 mr-2" />
                   Reject Gift

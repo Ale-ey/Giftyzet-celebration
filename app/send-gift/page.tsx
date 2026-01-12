@@ -1,7 +1,9 @@
 "use client"
 
+import { Suspense } from "react"
 import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
+import { Loader2 } from "lucide-react"
 import OrderConfirmationModal, { OrderData } from "@/components/checkout/OrderConfirmationModal"
 import type { Product, Service } from "@/types"
 
@@ -10,7 +12,7 @@ type CartItem = (Product | Service) & {
   type: "product" | "service"
 }
 
-export default function SendGiftPage() {
+function SendGiftContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [cartItems, setCartItems] = useState<CartItem[]>([])
@@ -121,3 +123,17 @@ export default function SendGiftPage() {
   )
 }
 
+export default function SendGiftPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="text-center">
+          <Loader2 className="h-12 w-12 text-primary mx-auto mb-4 animate-spin" />
+          <p className="text-gray-600">Loading gift order...</p>
+        </div>
+      </div>
+    }>
+      <SendGiftContent />
+    </Suspense>
+  )
+}

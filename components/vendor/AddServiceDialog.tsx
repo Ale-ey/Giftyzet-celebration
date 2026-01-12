@@ -359,7 +359,7 @@ export default function AddServiceDialog({ isOpen, onClose, onSave, editService,
                   ) : (
                     <div className="aspect-square border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center hover:border-gray-400 transition-colors">
                       <input
-                        ref={(el) => (fileInputRefs.current[index] = el)}
+                        ref={(el) => { fileInputRefs.current[index] = el }}
                         type="file"
                         accept="image/*"
                         onChange={(e) => handleImageUpload(index, e)}

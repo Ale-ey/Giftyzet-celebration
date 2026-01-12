@@ -1,5 +1,6 @@
 "use client"
 
+import { Suspense } from "react"
 import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { CheckCircle, Copy, Gift, Package, Loader2 } from "lucide-react"
@@ -7,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { useToast } from "@/components/ui/toast"
 
-export default function OrderSuccessPage() {
+function OrderSuccessContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { showToast } = useToast()
@@ -312,3 +313,20 @@ export default function OrderSuccessPage() {
   )
 }
 
+export default function OrderSuccessPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <Card className="max-w-2xl w-full border-2 border-gray-200 bg-white shadow-lg">
+          <div className="p-8 text-center">
+            <Loader2 className="h-20 w-20 text-primary mx-auto mb-6 animate-spin" />
+            <h1 className="text-3xl font-bold text-gray-900 mb-4">Loading...</h1>
+            <p className="text-gray-600">Please wait while we load your order details.</p>
+          </div>
+        </Card>
+      </div>
+    }>
+      <OrderSuccessContent />
+    </Suspense>
+  )
+}

@@ -1,7 +1,9 @@
 "use client"
 
+import { Suspense } from "react"
 import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
+import { Loader2 } from "lucide-react"
 import OrderConfirmationModal, { OrderData } from "@/components/checkout/OrderConfirmationModal"
 import { createOrder } from "@/lib/api/orders"
 import { getCurrentUser } from "@/lib/api/auth"
@@ -13,7 +15,7 @@ type CartItem = (Product | Service) & {
   type: "product" | "service"
 }
 
-export default function CheckoutPage() {
+function CheckoutContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { showToast } = useToast()
@@ -177,3 +179,17 @@ export default function CheckoutPage() {
   )
 }
 
+export default function CheckoutPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="text-center">
+          <Loader2 className="h-12 w-12 text-primary mx-auto mb-4 animate-spin" />
+          <p className="text-gray-600">Loading checkout...</p>
+        </div>
+      </div>
+    }>
+      <CheckoutContent />
+    </Suspense>
+  )
+}

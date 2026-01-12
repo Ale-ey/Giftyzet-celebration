@@ -1,8 +1,11 @@
+"use client"
+
+import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Star, Quote } from "lucide-react";
-import { useNavigate } from "react-router-dom";
-import { useAuth } from "@/hooks/useAuth";
+import { useRouter } from "next/navigation";
+import { getCurrentUser } from "@/lib/api/auth";
 
 const testimonials = [
   {
@@ -50,22 +53,34 @@ const testimonials = [
 ];
 
 export const TestimonialsSection = () => {
-  const navigate = useNavigate();
-  const { user } = useAuth();
+  const router = useRouter();
+  const [user, setUser] = useState<any>(null);
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const currentUser = await getCurrentUser();
+        setUser(currentUser);
+      } catch (error) {
+        setUser(null);
+      }
+    };
+    checkAuth();
+  }, []);
 
   const handleStartGifting = () => {
     if (user) {
-      navigate('/send-gift');
+      router.push('/marketplace');
     } else {
-      navigate('/auth?mode=signup');
+      router.push('/auth/login');
     }
   };
 
   const handleCreateWishlist = () => {
     if (user) {
-      navigate('/wishlist');
+      router.push('/wishlist');
     } else {
-      navigate('/auth?mode=signup');
+      router.push('/auth/login');
     }
   };
 

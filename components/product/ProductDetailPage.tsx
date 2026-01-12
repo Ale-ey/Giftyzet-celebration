@@ -156,7 +156,7 @@ export default function ProductDetailPage({ productId }: { productId: string }) 
             {/* Thumbnail Images */}
             {productImages.length > 1 && (
               <div className="grid grid-cols-4 gap-3">
-                {productImages.map((image, index) => (
+                {productImages.map((image: string, index: number) => (
                   <button
                     key={index}
                     onClick={() => setSelectedImageIndex(index)}

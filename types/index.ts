@@ -90,7 +90,15 @@ export interface Order {
   deliveredAt?: string
   shippingAddress?: string
   orderType?: "self" | "gift"
+  // Sender details
+  senderName?: string
+  senderEmail?: string
+  senderPhone?: string
   senderAddress?: string
+  // Receiver details (for gift orders)
+  receiverName?: string
+  receiverEmail?: string
+  receiverPhone?: string
   receiverAddress?: string
 }
 

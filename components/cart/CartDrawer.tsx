@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { X, Trash2, Plus, Minus, ShoppingCart, Gift, ArrowRight } from "lucide-react"
+import { X, Trash2, Plus, Minus, ShoppingCart, ArrowRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import type { Product } from "@/types"
@@ -72,8 +72,11 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
 
   const calculateSubtotal = () => {
     return cartItems.reduce((total, item) => {
-      const price = parseFloat(item.price.replace("$", ""))
-      return total + price * item.quantity
+      // Handle both string and number prices
+      const price = typeof item.price === 'string' 
+        ? parseFloat(item.price.replace("$", ""))
+        : parseFloat(String(item.price))
+      return total + (isNaN(price) ? 0 : price) * item.quantity
     }, 0)
   }
 
@@ -86,7 +89,7 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
 
   const handleCheckout = () => {
     onClose()
-    router.push("/checkout")
+    router.push("/checkout?type=self")
   }
 
   const handleViewCart = () => {
@@ -140,7 +143,8 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                 </p>
                 <Button
                   onClick={onClose}
-                  className="bg-primary hover:bg-primary/90 text-primary-foreground"
+                  variant="outline"
+                  className="border-2 border-gray-300 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-400 font-medium"
                 >
                   Continue Shopping
                 </Button>
@@ -184,7 +188,7 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                             variant="outline"
                             size="sm"
                             onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                            className="h-7 w-7 p-0 border-gray-300"
+                            className="h-7 w-7 p-0 border-gray-200 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-300"
                           >
                             <Minus className="h-3 w-3" />
                           </Button>
@@ -195,7 +199,7 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                             variant="outline"
                             size="sm"
                             onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                            className="h-7 w-7 p-0 border-gray-300"
+                            className="h-7 w-7 p-0 border-gray-200 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-300"
                           >
                             <Plus className="h-3 w-3" />
                           </Button>
@@ -250,7 +254,8 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
 
               <div className="space-y-2">
                 <Button
-                  className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
+                  variant="outline"
+                  className="w-full border-2 border-gray-300 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-400 font-medium"
                   onClick={handleCheckout}
                 >
                   Proceed to Checkout
@@ -258,18 +263,7 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                 </Button>
                 <Button
                   variant="outline"
-                  className="w-full border-2 border-primary text-primary hover:bg-primary/10"
-                  onClick={() => {
-                    router.push(`/send-gift?items=${encodeURIComponent(JSON.stringify(cartItems))}`)
-                    onClose()
-                  }}
-                >
-                  <Gift className="h-4 w-4 mr-2" />
-                  Gift All Items
-                </Button>
-                <Button
-                  variant="ghost"
-                  className="w-full text-gray-600 hover:text-gray-900"
+                  className="w-full border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 hover:border-gray-300 font-medium"
                   onClick={handleViewCart}
                 >
                   View Full Cart

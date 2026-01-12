@@ -210,7 +210,7 @@ export default function WishlistSection() {
                 
                 <Button 
                   variant="outline" 
-                  className="w-full mt-4 border-gray-300 text-gray-900 hover:bg-gray-50"
+                  className="w-full bg-gradient-celebration hover:opacity-90 text-white px-8 py-3 rounded-lg font-semibold shadow-celebration transition-all duration-300 hover:-translate-y-1 mt-4 border-gray-300 text-gray-900 hover:bg-gray-50"
                   onClick={handleCreateWishlist}
                 >
                   <Plus className="h-4 w-4 mr-2" />

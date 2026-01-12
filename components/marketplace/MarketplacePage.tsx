@@ -1,146 +1,99 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { Search, Filter } from "lucide-react"
+import { Search, Filter, Star, Gift, ShoppingCart, Package } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Star, Gift } from "lucide-react"
-import { featuredProducts } from "@/lib/constants"
-import type { Product } from "@/types"
-
-// Extended products list (in production, this would come from an API)
-const allProducts: Product[] = [
-  ...featuredProducts,
-  {
-    id: 5,
-    name: "Wireless Headphones",
-    price: "$79.99",
-    originalPrice: "$99.99",
-    rating: 4.5,
-    reviews: 892,
-    category: "Electronics",
-    vendor: "TechBrand",
-    image: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=300&h=300&fit=crop",
-    discount: "20% OFF"
-  },
-  {
-    id: 6,
-    name: "Facial Treatment",
-    price: "$89.99",
-    originalPrice: "$120.00",
-    rating: 4.7,
-    reviews: 456,
-    category: "Beauty & Wellness",
-    vendor: "Glow Spa",
-    image: "https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?w=300&h=300&fit=crop",
-    discount: "25% OFF"
-  },
-  {
-    id: 7,
-    name: "Gourmet Dinner for Two",
-    price: "$149.99",
-    originalPrice: "$199.99",
-    rating: 4.9,
-    reviews: 1234,
-    category: "Food & Experiences",
-    vendor: "Fine Dining Co",
-    image: "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=300&h=300&fit=crop",
-    discount: "Limited Time"
-  },
-  {
-    id: 8,
-    name: "Home Organization Service",
-    price: "$199.99",
-    originalPrice: "$249.99",
-    rating: 4.6,
-    reviews: 678,
-    category: "Home Services",
-    vendor: "OrganizePro",
-    image: "https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=300&h=300&fit=crop",
-    discount: "First Time"
-  },
-  {
-    id: 9,
-    name: "Handmade Ceramic Set",
-    price: "$59.99",
-    originalPrice: "$79.99",
-    rating: 4.8,
-    reviews: 345,
-    category: "Local Artisans",
-    vendor: "Artisan Crafts",
-    image: "https://images.unsplash.com/photo-1578749556568-bc2c40e68581?w=300&h=300&fit=crop",
-    discount: "25% OFF"
-  },
-  {
-    id: 10,
-    name: "Smart Watch",
-    price: "$299.99",
-    originalPrice: "$349.99",
-    rating: 4.6,
-    reviews: 2134,
-    category: "Electronics",
-    vendor: "TechBrand",
-    image: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=300&h=300&fit=crop",
-    discount: "14% OFF"
-  },
-  {
-    id: 11,
-    name: "Yoga Class Package",
-    price: "$99.99",
-    originalPrice: "$129.99",
-    rating: 4.7,
-    reviews: 567,
-    category: "Beauty & Wellness",
-    vendor: "Zen Studio",
-    image: "https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=300&h=300&fit=crop",
-    discount: "23% OFF"
-  },
-  {
-    id: 12,
-    name: "Cooking Class Experience",
-    price: "$119.99",
-    originalPrice: "$149.99",
-    rating: 4.8,
-    reviews: 789,
-    category: "Food & Experiences",
-    vendor: "Culinary Academy",
-    image: "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=300&h=300&fit=crop",
-    discount: "20% OFF"
-  }
-]
+import { useToast } from "@/components/ui/toast"
+import { STORE_CATEGORIES } from "@/lib/constants"
+import { getApprovedProducts } from "@/lib/api/products"
 
 const categories = [
   { name: "All Categories", value: "all" },
-  { name: "Electronics", value: "Electronics" },
-  { name: "Beauty & Wellness", value: "Beauty & Wellness" },
-  { name: "Food & Experiences", value: "Food & Experiences" },
-  { name: "Home Services", value: "Home Services" },
-  { name: "Local Artisans", value: "Local Artisans" },
-  { name: "Experiences", value: "Experiences" },
-  { name: "Services", value: "Services" }
+  ...STORE_CATEGORIES.map((cat) => ({ name: cat, value: cat }))
 ]
 
 export default function MarketplacePage() {
+  const router = useRouter()
+  const { showToast } = useToast()
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedCategory, setSelectedCategory] = useState("all")
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [products, setProducts] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    loadProducts()
+  }, [])
+
+  const loadProducts = async () => {
+    try {
+      setLoading(true)
+      const data = await getApprovedProducts()
+      console.log("Products data:", data)
+      if (data && data.length > 0) {
+        console.log("First product stores:", data[0].stores)
+      }
+      setProducts(data || [])
+    } catch (error) {
+      console.error("Error loading products:", error)
+      setProducts([])
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const filteredProducts = useMemo(() => {
-    return allProducts.filter((product) => {
+    return products.filter((product) => {
+      const vendorName = product.stores?.vendors?.vendor_name || ""
       const matchesSearch = 
         product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        product.vendor.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        vendorName.toLowerCase().includes(searchQuery.toLowerCase()) ||
         product.category.toLowerCase().includes(searchQuery.toLowerCase())
       
       const matchesCategory = 
         selectedCategory === "all" || product.category === selectedCategory
       
-      return matchesSearch && matchesCategory
+      return matchesSearch && matchesCategory && product.available !== false
     })
-  }, [searchQuery, selectedCategory])
+  }, [products, searchQuery, selectedCategory])
+
+  const handleAddToCart = (product: any) => {
+    const cartItem = {
+      id: product.id,
+      name: product.name,
+      price: `$${product.price}`,
+      image: product.image_url,
+      quantity: 1,
+      type: "product",
+      vendor: product.stores?.vendors?.vendor_name || product.stores?.name || "Unknown Vendor"
+    }
+    const existingCart = JSON.parse(localStorage.getItem("cart") || "[]")
+    const existingItemIndex = existingCart.findIndex((item: any) => item.id === product.id && item.type === "product")
+    
+    if (existingItemIndex >= 0) {
+      existingCart[existingItemIndex].quantity += 1
+    } else {
+      existingCart.push(cartItem)
+    }
+    
+    localStorage.setItem("cart", JSON.stringify(existingCart))
+    window.dispatchEvent(new Event("cartUpdated"))
+    showToast(`Added ${product.name} to cart!`, "success")
+  }
+
+  const handleBuyNow = (product: any) => {
+    handleAddToCart(product)
+    router.push("/cart")
+  }
+
+  const handleGiftNow = (product: any) => {
+    handleAddToCart(product)
+    router.push("/send-gift")
+  }
 
   return (
     <div className="min-h-screen bg-white">
@@ -149,7 +102,7 @@ export default function MarketplacePage() {
         <div className="mb-8">
           <h1 className="text-4xl font-bold text-gray-900 mb-2">Marketplace</h1>
           <p className="text-gray-600 mb-6">
-            Discover thousands of products and services from leading brands
+            Discover thousands of products from verified vendors
           </p>
           
           {/* Search Bar - Centered */}
@@ -178,7 +131,7 @@ export default function MarketplacePage() {
         </div>
 
         <div className="flex flex-col lg:flex-row gap-8">
-          {/* Categories Sidebar - Minimal */}
+          {/* Categories Sidebar */}
           <aside className={`lg:w-56 flex-shrink-0 ${isMobileMenuOpen ? "block" : "hidden md:block"}`}>
             <div className="bg-white border border-gray-200 rounded-lg p-4">
               <h2 className="text-sm font-semibold text-gray-900 mb-3 uppercase tracking-wide">Categories</h2>
@@ -205,27 +158,117 @@ export default function MarketplacePage() {
 
           {/* Products Grid */}
           <div className="flex-1">
-            <div className="flex items-center justify-between mb-6">
+            {loading ? (
+              <div className="flex items-center justify-center py-20">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+                  <p className="text-gray-600">Loading products...</p>
+                </div>
+              </div>
+            ) : filteredProducts.length === 0 ? (
+              <div className="text-center py-20">
+                <Package className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">No Products Found</h3>
               <p className="text-gray-600">
-                Showing <span className="font-semibold text-gray-900">{filteredProducts.length}</span> products
+                  {searchQuery || selectedCategory !== "all" 
+                    ? "Try adjusting your search or filters"
+                    : "No products available at the moment"}
               </p>
             </div>
-
-            {filteredProducts.length === 0 ? (
-              <Card className="border-2 border-gray-100">
-                <CardContent className="p-12 text-center">
-                  <p className="text-gray-600 text-lg mb-2">No products found</p>
-                  <p className="text-gray-500 text-sm">
-                    Try adjusting your search or category filter
+            ) : (
+              <>
+                <div className="flex items-center justify-between mb-4">
+                  <p className="text-sm text-gray-600">
+                    Showing {filteredProducts.length} {filteredProducts.length === 1 ? "product" : "products"}
                   </p>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                  {filteredProducts.map((product) => (
+                    <Card 
+                      key={product.id} 
+                      className="group border border-gray-200 bg-white overflow-hidden hover:shadow-lg transition-all duration-300"
+                    >
+                      <div 
+                        className="aspect-square overflow-hidden bg-gray-100 relative cursor-pointer"
+                        onClick={() => router.push(`/product/${product.id}`)}
+                      >
+                        {product.image_url ? (
+                          <img
+                            src={product.image_url}
+                            alt={product.name}
+                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center bg-gray-200">
+                            <Package className="h-16 w-16 text-gray-400" />
+                          </div>
+                        )}
+                        {product.original_price && product.price < product.original_price && (
+                          <Badge className="absolute top-2 right-2 bg-red-500 text-white border-0">
+                            {Math.round(((product.original_price - product.price) / product.original_price) * 100)}% OFF
+                          </Badge>
+                        )}
+                      </div>
+                      <CardContent className="p-4">
+                        <div className="mb-2">
+                          <h3 
+                            className="font-semibold text-gray-900 line-clamp-2 mb-1 group-hover:text-primary transition-colors cursor-pointer"
+                            onClick={() => router.push(`/product/${product.id}`)}
+                          >
+                            {product.name}
+                          </h3>
+                          <p className="text-xs text-gray-500">
+                            by {product.stores?.vendors?.vendor_name || product.stores?.name || "Unknown Vendor"}
+                          </p>
+                        </div>
+                        
+                        <div className="flex items-center gap-1 mb-3">
+                          <div className="flex">
+                            {[...Array(5)].map((_, i) => (
+                              <Star
+                                key={i}
+                                className={`h-3 w-3 ${
+                                  i < Math.floor(product.rating || 0)
+                                    ? "fill-yellow-400 text-yellow-400"
+                                    : "fill-gray-200 text-gray-200"
+                                }`}
+                              />
+                            ))}
+                          </div>
+                          <span className="text-xs text-gray-600">
+                            ({product.reviews_count || 0})
+                          </span>
+                        </div>
+
+                        <div className="flex items-baseline gap-2 mb-3">
+                          <span className="text-xl font-bold text-primary">
+                            ${product.price}
+                          </span>
+                          {product.original_price && product.price < product.original_price && (
+                            <span className="text-sm text-gray-400 line-through">
+                              ${product.original_price}
+                            </span>
+                          )}
+                        </div>
+
+                        <Badge variant="outline" className="mb-3 text-xs border-gray-200 text-gray-600">
+                          {product.category}
+                        </Badge>
+
+                        <Button
+                          onClick={() => handleAddToCart(product)}
+                          size="sm"
+                          className="w-full bg-red-500 hover:bg-red-600 text-white font-medium"
+                        >
+                          <ShoppingCart className="h-4 w-4 mr-2" />
+                          Add to Cart
+                        </Button>
                 </CardContent>
               </Card>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {filteredProducts.map((product) => (
-                  <ProductCard key={product.id} product={product} />
                 ))}
               </div>
+              </>
             )}
           </div>
         </div>
@@ -233,79 +276,3 @@ export default function MarketplacePage() {
     </div>
   )
 }
-
-function ProductCard({ product }: { product: Product }) {
-  const router = useRouter()
-  
-  const handleCardClick = () => {
-    router.push(`/product/${product.id}`)
-  }
-  
-  const handleGiftNow = (e: React.MouseEvent) => {
-    e.stopPropagation() // Prevent card click
-    router.push(`/send-gift?product=${encodeURIComponent(JSON.stringify(product))}`)
-  }
-
-  return (
-    <Card 
-      className="group hover:shadow-xl border-2 border-gray-100 hover:border-primary/20 transition-all duration-300 hover:-translate-y-2 overflow-hidden bg-white cursor-pointer"
-      onClick={handleCardClick}
-    >
-      <div className="relative">
-        <img 
-          src={product.image} 
-          alt={product.name}
-          className="w-full h-48 object-cover group-hover:scale-110 transition-transform duration-300"
-          loading="lazy"
-          decoding="async"
-        />
-        <Badge className="absolute top-2 left-2 bg-secondary text-gray-900 font-semibold shadow-md">
-          {product.discount}
-        </Badge>
-        <Button
-          size="sm"
-          className="absolute top-2 right-2 bg-white/90 text-primary hover:bg-white opacity-0 group-hover:opacity-100 transition-opacity"
-          onClick={handleGiftNow}
-        >
-          <Gift className="h-4 w-4" />
-        </Button>
-      </div>
-      
-      <CardContent className="p-5">
-        <div className="flex items-start justify-between mb-3">
-          <Badge variant="outline" className="text-xs border-gray-300 text-gray-700">
-            {product.category}
-          </Badge>
-          <div className="flex items-center text-xs text-gray-600 font-medium">
-            <Star className="h-3.5 w-3.5 fill-current text-yellow-500 mr-1" />
-            {product.rating} ({product.reviews})
-          </div>
-        </div>
-        
-        <h3 className="font-bold text-base mb-2 line-clamp-2 text-gray-900 group-hover:text-primary transition-colors">
-          {product.name}
-        </h3>
-        
-        <div className="text-sm text-gray-600 mb-4 font-medium">
-          by {product.vendor}
-        </div>
-        
-        <div className="flex items-center space-x-2 mb-4">
-          <span className="font-bold text-lg text-primary">{product.price}</span>
-          <span className="text-sm text-gray-500 line-through">
-            {product.originalPrice}
-          </span>
-        </div>
-        
-        <Button 
-          size="sm" 
-          className="w-full bg-primary hover:bg-primary/90 text-white font-semibold"
-          onClick={handleGiftNow}
-        >
-          Gift Now
-        </Button>
-      </CardContent>
-    </Card>
-  )
-}
-

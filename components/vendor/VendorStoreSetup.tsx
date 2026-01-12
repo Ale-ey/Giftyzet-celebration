@@ -49,7 +49,7 @@ export default function VendorStoreSetup() {
       saveVendor(vendor)
       
       // Create store with approved status for testing
-      const store = {
+      const store: Store = {
         id: `store-${Date.now()}`,
         vendorId,
         name: "Demo Store",
@@ -69,7 +69,7 @@ export default function VendorStoreSetup() {
     
     if (!vendorStore) {
       // Create store if doesn't exist
-      const store = {
+      const store: Store = {
         id: `store-${Date.now()}`,
         vendorId: vendor.id,
         name: vendor.vendorName,

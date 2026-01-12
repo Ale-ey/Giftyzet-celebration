@@ -302,7 +302,7 @@ export default function VendorOrdersPage() {
                     <div>
                       <h4 className="font-semibold text-gray-900 mb-2">Items ({order.items.length}):</h4>
                       <div className="space-y-2">
-                        {order.items.slice(0, 2).map((item, idx) => (
+                        {order.items.slice(0, 2).map((item: any, idx: number) => (
                           <div key={idx} className="flex items-center justify-between p-2 bg-gray-50 rounded">
                             <div className="flex items-center gap-3">
                               {item.image && (

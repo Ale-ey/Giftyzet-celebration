@@ -186,14 +186,16 @@ export async function getTopVendorsByRating(limit?: number) {
         ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length
         : 0
 
+      const vendor = Array.isArray(store.vendors) ? store.vendors[0] : store.vendors
+      
       return {
         id: store.id,
         name: store.name,
         description: store.description,
         category: store.category || 'General',
         logo_url: store.logo_url,
-        vendor_name: store.vendors?.vendor_name || store.vendors?.business_name || 'Unknown',
-        vendor_id: store.vendors?.id,
+        vendor_name: vendor?.vendor_name || vendor?.business_name || 'Unknown',
+        vendor_id: vendor?.id,
         rating: Math.round(avgRating * 10) / 10,
         totalReviews: reviews?.length || 0,
         totalProducts: (productCount || 0) + (serviceCount || 0),

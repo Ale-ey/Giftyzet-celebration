@@ -179,9 +179,9 @@ export default function StoreRegistrationPage() {
         try {
           const userProfile = await getCurrentUserWithProfile()
           const vendor = await createVendor(user.id, {
-            vendor_name: userProfile.name || formData.name || user.email?.split("@")[0] || "Vendor",
+            vendor_name: userProfile?.name || formData.name || user.email?.split("@")[0] || "Vendor",
             email: user.email || formData.email || "",
-            business_name: formData.name || userProfile.name || "Vendor"
+            business_name: formData.name || userProfile?.name || "Vendor"
           })
           currentVendorId = vendor.id
           setVendorId(vendor.id)
@@ -224,6 +224,11 @@ export default function StoreRegistrationPage() {
         showToast("Store registration updated successfully. Waiting for admin approval.", "success")
       } else {
         // Create new store
+        if (!currentVendorId) {
+          showToast("Vendor ID is missing. Please try again.", "error")
+          setSaving(false)
+          return
+        }
         const newStore = await createStore(currentVendorId, storeData)
         setStoreId(newStore.id)
         setStoreStatus("pending")

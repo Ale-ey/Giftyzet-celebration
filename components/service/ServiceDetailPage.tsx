@@ -162,7 +162,7 @@ export default function ServiceDetailPage({ serviceId }: { serviceId: string }) 
             {/* Thumbnail Images */}
             {serviceImages.length > 1 && (
               <div className="grid grid-cols-4 gap-3">
-                {serviceImages.map((image, index) => (
+                {serviceImages.map((image: string, index: number) => (
                   <button
                     key={index}
                     onClick={() => setSelectedImageIndex(index)}

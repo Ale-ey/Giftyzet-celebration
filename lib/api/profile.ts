@@ -180,7 +180,7 @@ export async function deleteAvatar(userId?: string): Promise<FullProfile> {
   const targetUserId = userId || user.id
 
   // Update profile to remove avatar URL
-  return updateProfile(targetUserId, { avatar_url: null })
+  return updateProfile(targetUserId, { avatar_url: undefined })
 }
 
 /**

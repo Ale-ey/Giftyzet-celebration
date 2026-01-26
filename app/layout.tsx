@@ -20,8 +20,18 @@ export const metadata: Metadata = {
     default: "GiftyZel - Send Perfect Gifts Without Knowing Addresses",
     template: "%s | GiftyZel",
   },
-  description: "Send thoughtful gifts to anyone using just their phone number, email, or social media. Privacy-first gifting platform.",
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://giftyzel.com"),
+  description:
+    "Send thoughtful gifts to anyone using just their phone number, email, or social media. Privacy-first gifting platform.",
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_SITE_URL || "https://giftyzel.com",
+  ),
+  icons: {
+    icon: [
+      { url: "/logo.png", sizes: "32x32", type: "image/png" },
+      { url: "/logo.png", sizes: "16x16", type: "image/png" },
+    ],
+    apple: { url: "/logo.png", sizes: "180x180", type: "image/png" },
+  },
 };
 
 export default function RootLayout({

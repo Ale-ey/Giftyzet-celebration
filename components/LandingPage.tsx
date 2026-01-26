@@ -447,7 +447,7 @@ export default function LandingPage() {
               {[...Array(6)].map((_, i) => (
                 <div
                   key={i}
-                  className="flex-shrink-0 w-64 h-80 bg-gray-200 animate-pulse rounded-lg"
+                  className="flex-shrink-0 w-64 h-80 bg-white border border-gray-200 animate-pulse rounded-lg"
                 />
               ))}
             </div>
@@ -499,9 +499,8 @@ export default function LandingPage() {
                       </div>
                       <div className="flex gap-2">
                         <Button
-                          variant="outline"
                           size="sm"
-                          className="flex-1"
+                          className="flex-1 bg-white hover:bg-gray-50 text-gray-900 border border-gray-200"
                           onClick={() => router.push(`/product/${product.id}`)}
                         >
                           <ShoppingCart className="h-4 w-4 mr-1" />
@@ -565,7 +564,7 @@ export default function LandingPage() {
               {[...Array(4)].map((_, i) => (
                 <div
                   key={i}
-                  className="flex-shrink-0 w-80 h-96 bg-gray-200 animate-pulse rounded-lg"
+                  className="flex-shrink-0 w-80 h-96 bg-white border border-gray-200 animate-pulse rounded-lg"
                 />
               ))}
             </div>
@@ -627,9 +626,8 @@ export default function LandingPage() {
                         </div>
                         <div className="flex gap-2">
                           <Button
-                            variant="outline"
                             size="sm"
-                            className="flex-1"
+                            className="flex-1 bg-white hover:bg-gray-50 text-gray-900 border border-gray-200"
                             onClick={() =>
                               router.push(`/service/${service.id}`)
                             }

@@ -45,11 +45,7 @@ export default function VendorRegistrationModal({
       const user = await getCurrentUser();
 
       if (!user) {
-        showToast({
-          title: "Authentication Required",
-          description: "Please log in to register as a vendor.",
-          type: "error",
-        });
+        showToast("Please log in to register as a vendor.", "error");
         onClose();
         // Trigger auth modal or redirect to login
         router.push("/?auth=login");
@@ -67,11 +63,7 @@ export default function VendorRegistrationModal({
       onClose();
     } catch (error) {
       console.error("Error:", error);
-      showToast({
-        title: "Error",
-        description: "Something went wrong. Please try again.",
-        type: "error",
-      });
+      showToast("Something went wrong. Please try again.", "error");
     } finally {
       setLoading(false);
     }

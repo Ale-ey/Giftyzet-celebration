@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
     // If stores join fails, try with vendor_accounts (new schema)
     if (error) {
       console.log("Trying vendor_accounts schema...")
-      query = supabase
+      const vendorQuery = supabase
         .from("products")
         .select(`
           id,
@@ -61,8 +61,8 @@ export async function GET(request: NextRequest) {
         .order("created_at", { ascending: false })
         .limit(limit)
 
-      const result = await query
-      products = result.data
+      const result = await vendorQuery
+      products = result.data as any
       error = result.error
     }
 

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import MarketplacePage from "@/components/marketplace/MarketplacePage";
 
 export const metadata: Metadata = {
@@ -10,6 +11,21 @@ export const metadata: Metadata = {
   },
 };
 
+function MarketplaceLoader() {
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-white to-gray-50 flex items-center justify-center">
+      <div className="text-center">
+        <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        <p className="mt-4 text-gray-600">Loading marketplace...</p>
+      </div>
+    </div>
+  );
+}
+
 export default function Marketplace() {
-  return <MarketplacePage />;
+  return (
+    <Suspense fallback={<MarketplaceLoader />}>
+      <MarketplacePage />
+    </Suspense>
+  );
 }

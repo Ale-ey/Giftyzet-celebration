@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useMemo, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Search, Filter, Star, Gift, ShoppingCart, Package } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -18,12 +18,26 @@ const categories = [
 
 export default function MarketplacePage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { showToast } = useToast()
-  const [searchQuery, setSearchQuery] = useState("")
-  const [selectedCategory, setSelectedCategory] = useState("all")
+  
+  // Read category and search from URL params
+  const categoryFromUrl = searchParams.get("category") || "all"
+  const searchFromUrl = searchParams.get("search") || ""
+  
+  const [searchQuery, setSearchQuery] = useState(searchFromUrl)
+  const [selectedCategory, setSelectedCategory] = useState(categoryFromUrl)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [products, setProducts] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+
+  // Update state when URL params change
+  useEffect(() => {
+    const category = searchParams.get("category") || "all"
+    const search = searchParams.get("search") || ""
+    setSelectedCategory(category)
+    setSearchQuery(search)
+  }, [searchParams])
 
   useEffect(() => {
     loadProducts()
@@ -114,6 +128,17 @@ export default function MarketplacePage() {
                 placeholder="Search products, vendors, or categories..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyPress={(e) => {
+                  if (e.key === "Enter") {
+                    const params = new URLSearchParams(searchParams.toString())
+                    if (searchQuery.trim()) {
+                      params.set("search", searchQuery.trim())
+                    } else {
+                      params.delete("search")
+                    }
+                    router.push(`/marketplace?${params.toString()}`)
+                  }
+                }}
                 className="pl-10 pr-4 py-6 text-base bg-gray-50 border-2 border-gray-200 text-gray-900 placeholder:text-gray-500 focus:border-primary focus:bg-white"
               />
             </div>
@@ -142,6 +167,14 @@ export default function MarketplacePage() {
                     onClick={() => {
                       setSelectedCategory(category.value)
                       setIsMobileMenuOpen(false)
+                      // Update URL with category
+                      const params = new URLSearchParams(searchParams.toString())
+                      if (category.value === "all") {
+                        params.delete("category")
+                      } else {
+                        params.set("category", category.value)
+                      }
+                      router.push(`/marketplace?${params.toString()}`)
                     }}
                     className={`w-full text-left px-3 py-2 rounded-md text-sm transition-all ${
                       selectedCategory === category.value

@@ -46,8 +46,8 @@ export default function ProductDetailPage({ productId }: { productId: string }) 
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <Card className="border-2 border-gray-100">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <Card className="border-2 border-gray-200 bg-white">
           <CardContent className="p-12 text-center">
             <p className="text-gray-600 text-lg">Loading product...</p>
           </CardContent>

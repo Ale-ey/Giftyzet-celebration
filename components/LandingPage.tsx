@@ -26,6 +26,18 @@ import {
   Package,
   Smartphone,
   Palette,
+  Flower,
+  Shield,
+  Lock,
+  CreditCard,
+  Store,
+  CheckCircle2,
+  ArrowRight,
+  FileText,
+  Plug,
+  MapPin,
+  Clock,
+  Search,
 } from "lucide-react";
 import Image from "next/image";
 import { getTopVendorsByRating } from "@/lib/api/vendors";
@@ -298,7 +310,7 @@ export default function LandingPage() {
 
   const scrollCarousel = (
     direction: "left" | "right",
-    type: "products" | "services",
+    type: "products" | "services" | "vendors" | "cta",
   ) => {
     const container = document.getElementById(`${type}-carousel`);
     if (container) {
@@ -336,8 +348,9 @@ export default function LandingPage() {
               </div>
               <Button
                 onClick={handleSearch}
-                className="bg-primary hover:bg-primary/90 text-white rounded-full px-8 py-4 h-auto"
+                className="bg-primary hover:bg-primary/90 hover:scale-105 hover:shadow-lg text-white rounded-full px-8 py-4 h-auto transition-all duration-200 flex items-center gap-2"
               >
+                <Search className="h-5 w-5" />
                 Search
               </Button>
             </div>
@@ -346,24 +359,24 @@ export default function LandingPage() {
             <div className="flex flex-wrap justify-center gap-3 mb-6">
               <Button
                 variant="outline"
-                className="bg-white/10 backdrop-blur-sm border-white/30 text-white hover:bg-white/20 rounded-full"
+                className="bg-white/10 backdrop-blur-sm border-white/30 text-white hover:text-white hover:bg-white/10 rounded-full"
               >
-                <Phone className="h-4 w-4 mr-2" />
-                Phone
+                <Smartphone className="h-4 w-4 mr-2" />
+                iPhone
               </Button>
               <Button
                 variant="outline"
-                className="bg-white/10 backdrop-blur-sm border-white/30 text-white hover:bg-white/20 rounded-full"
+                className="bg-white/10 backdrop-blur-sm border-white/30 text-white hover:text-white hover:bg-white/10 rounded-full"
               >
-                <Sparkles className="h-4 w-4 mr-2" />
-                Spa Day
+                <Flower className="h-4 w-4 mr-2" />
+                Flowers
               </Button>
               <Button
                 variant="outline"
-                className="bg-white/10 backdrop-blur-sm border-white/30 text-white hover:bg-white/20 rounded-full"
+                className="bg-white/10 backdrop-blur-sm border-white/30 text-white hover:text-white hover:bg-white/10 rounded-full"
               >
-                <Gift className="h-4 w-4 mr-2" />
-                Gift Card
+                <Cake className="h-4 w-4 mr-2" />
+                Cake
               </Button>
             </div>
 
@@ -371,7 +384,7 @@ export default function LandingPage() {
             <div className="flex justify-center gap-3">
               <Button
                 onClick={() => router.push("/marketplace")}
-                className="bg-primary hover:bg-primary/90 text-white rounded-full px-8 py-4 h-auto text-lg"
+                className="bg-primary hover:bg-primary/90 hover:scale-105 hover:shadow-lg text-white rounded-full px-8 py-4 h-auto text-lg transition-all duration-200"
               >
                 <ShoppingBag className="h-5 w-5 mr-2" />
                 Browse Marketplace
@@ -447,7 +460,7 @@ export default function LandingPage() {
               {[...Array(6)].map((_, i) => (
                 <div
                   key={i}
-                  className="flex-shrink-0 w-64 h-80 bg-white border border-gray-200 animate-pulse rounded-lg"
+                  className="flex-shrink-0 w-64 h-80 bg-gray-50 border border-gray-100 animate-pulse rounded-lg"
                 />
               ))}
             </div>
@@ -530,24 +543,23 @@ export default function LandingPage() {
       <section className="py-12 bg-gray-50">
         <div className="container mx-auto px-4">
           <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-2">
-              <h2 className="text-2xl font-bold text-gray-800">
+            <div className="flex items-center gap-3">
+              <h2 className="text-2xl font-bold text-purple-800">
                 Gift a Service
               </h2>
-              <Gift className="h-5 w-5 text-pink-500" />
             </div>
             <div className="flex items-center gap-4">
               <button
                 onClick={() => scrollCarousel("left", "services")}
-                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                className="bg-gray-700/80 hover:bg-gray-700 rounded-full p-2 transition-colors"
               >
-                <ChevronLeft className="h-6 w-6 text-gray-600" />
+                <ChevronLeft className="h-5 w-5 text-white" />
               </button>
               <button
                 onClick={() => scrollCarousel("right", "services")}
-                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                className="bg-gray-700/80 hover:bg-gray-700 rounded-full p-2 transition-colors"
               >
-                <ChevronRight className="h-6 w-6 text-gray-600" />
+                <ChevronRight className="h-5 w-5 text-white" />
               </button>
               <Button
                 variant="link"
@@ -564,7 +576,7 @@ export default function LandingPage() {
               {[...Array(4)].map((_, i) => (
                 <div
                   key={i}
-                  className="flex-shrink-0 w-80 h-96 bg-white border border-gray-200 animate-pulse rounded-lg"
+                  className="flex-shrink-0 w-80 h-96 bg-gray-50 border border-gray-100 animate-pulse rounded-lg"
                 />
               ))}
             </div>
@@ -574,168 +586,221 @@ export default function LandingPage() {
               className="flex gap-4 overflow-x-auto pb-4 scrollbar-custom"
               style={{ scrollbarWidth: "thin" }}
             >
-              {services.length > 0 ? (
-                services.map((service) => (
-                  <Card
-                    key={service.id}
-                    className="flex-shrink-0 w-80 bg-white border border-gray-200 shadow-sm hover:shadow-md transition-shadow"
-                  >
-                    <CardContent className="p-0">
-                      <div className="relative">
-                        <div className="absolute top-2 left-2 z-10">
-                          <span
-                            className={`${
-                              service.category === "Cleaning"
-                                ? "bg-blue-100 text-blue-900"
-                                : service.category === "Catering"
-                                  ? "bg-green-100 text-green-900"
-                                  : "bg-gray-100 text-gray-900"
-                            } text-xs font-bold px-2 py-1 rounded`}
-                          >
-                            {service.category}
-                          </span>
+                {services.length > 0 ? (
+                  services.map((service) => (
+                    <Card
+                      key={service.id}
+                      className="flex-shrink-0 w-80 bg-white border border-gray-200 shadow-sm hover:shadow-md transition-shadow rounded-lg"
+                    >
+                      <CardContent className="p-0">
+                        {/* Image Section */}
+                        <div className="relative">
+                          {/* Category Tag */}
+                          <div className="absolute top-2 left-2 z-10">
+                            <span className="bg-purple-100 text-purple-900 text-xs font-bold px-2 py-1 rounded">
+                              {service.category || "Service"}
+                            </span>
+                          </div>
+                          {/* Image */}
+                          <div className="w-full h-48 bg-gray-50 relative overflow-hidden rounded-t-lg">
+                            {service.image_url ? (
+                              <Image
+                                src={service.image_url}
+                                alt={service.name}
+                                fill
+                                className="object-cover"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-gray-400">
+                                No Image
+                              </div>
+                            )}
+                          </div>
                         </div>
-                        <div className="w-full h-48 bg-gray-50 relative overflow-hidden">
-                          {service.image_url ? (
-                            <Image
-                              src={service.image_url}
-                              alt={service.name}
-                              fill
-                              className="object-cover"
-                            />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center text-gray-400">
-                              No Image
+
+                        {/* Content Section */}
+                        <div className="p-4 bg-white rounded-b-lg">
+                          {/* Title and Rating */}
+                          <div className="flex items-start justify-between mb-2">
+                            <h3 className="font-bold text-gray-800 text-base flex-1">
+                              {service.name}
+                            </h3>
+                            <span className="text-sm text-gray-500 ml-2">
+                              {service.rating || 0}
+                            </span>
+                          </div>
+
+                          {/* Description */}
+                          <p className="text-sm text-gray-600 mb-3 line-clamp-2">
+                            {service.description}
+                          </p>
+
+                          {/* Location and Duration */}
+                          <div className="flex items-center gap-4 text-sm text-gray-500 mb-3">
+                            <div className="flex items-center gap-1">
+                              <MapPin className="h-3 w-3" />
+                              <span>{service.location || "Downtown Area"}</span>
                             </div>
-                          )}
+                            <div className="flex items-center gap-1">
+                              <Clock className="h-3 w-3" />
+                              <span>{service.duration_hours || 3}h</span>
+                            </div>
+                          </div>
+
+                          {/* Price and Buttons */}
+                          <div className="flex items-center justify-between">
+                            <div className="text-lg font-bold text-purple-600">
+                              ${service.price_per_hour?.toFixed(2) || "0.00"}/hr
+                            </div>
+                            <div className="flex gap-2">
+                              <Button
+                                size="sm"
+                                className="bg-white hover:bg-gray-50 text-gray-900 border border-gray-200 rounded-lg px-3 py-2 h-auto"
+                                onClick={() =>
+                                  router.push(`/service/${service.id}`)
+                                }
+                              >
+                                <Calendar className="h-4 w-4 mr-1" />
+                                Book
+                              </Button>
+                              <Button
+                                size="sm"
+                                className="bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600 text-white rounded-lg px-3 py-2 h-auto"
+                                onClick={() =>
+                                  router.push(`/service/${service.id}?gift=true`)
+                                }
+                              >
+                                <Gift className="h-4 w-4 mr-1" />
+                                Gift
+                              </Button>
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                      <div className="p-4 bg-white">
-                        <h3 className="font-semibold text-gray-800 mb-2">
-                          {service.name}
-                        </h3>
-                        <p className="text-sm text-gray-600 mb-3 line-clamp-2">
-                          {service.description}
-                        </p>
-                        <div className="flex items-center justify-between text-sm text-gray-500 mb-3">
-                          <span>{service.location || "Downtown Area"}</span>
-                          <span>{service.duration_hours || 3}h</span>
-                        </div>
-                        <div className="text-lg font-bold text-gray-900 mb-3">
-                          ${service.price_per_hour?.toFixed(2) || "0.00"}/hr
-                        </div>
-                        <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            className="flex-1 bg-white hover:bg-gray-50 text-gray-900 border border-gray-200"
-                            onClick={() =>
-                              router.push(`/service/${service.id}`)
-                            }
-                          >
-                            <Calendar className="h-4 w-4 mr-1" />
-                            Book
-                          </Button>
-                          <Button
-                            size="sm"
-                            className="flex-1 bg-primary hover:bg-primary/90 text-white"
-                            onClick={() =>
-                              router.push(`/service/${service.id}?gift=true`)
-                            }
-                          >
-                            <Gift className="h-4 w-4 mr-1" />
-                            Gift
-                          </Button>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))
-              ) : (
-                <div className="w-full text-center py-8 text-gray-500">
-                  No services available at the moment. Check back soon!
-                </div>
-              )}
-            </div>
+                      </CardContent>
+                    </Card>
+                  ))
+                ) : (
+                  <div className="w-full text-center py-8 text-gray-500">
+                    No services available at the moment. Check back soon!
+                  </div>
+                )}
+              </div>
           )}
         </div>
       </section>
 
       {/* Trusted Vendors Section */}
-      <section className="py-12 bg-white">
+      <section className="py-12 bg-pink-50">
         <div className="container mx-auto px-4">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold text-gray-800">
-              Trusted Vendors
-            </h2>
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center gap-2">
+                <Store className="h-6 w-6 text-yellow-500" />
+                <h2 className="text-2xl font-bold text-gray-800">
+                  Trusted Vendors
+                </h2>
+              </div>
+              <p className="text-sm text-gray-600 ml-8">
+                Verified merchants ready to fulfill your gifts.
+              </p>
+            </div>
             <Button
               variant="link"
               onClick={() => router.push("/vendors")}
-              className="text-pink-500 hover:text-pink-600"
+              className="text-yellow-600 hover:text-yellow-700 flex items-center gap-1"
             >
               View All
+              <ArrowRight className="h-4 w-4" />
             </Button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {/* Vendor Cards Carousel */}
+          <div
+            id="vendors-carousel"
+            className="flex gap-6 overflow-x-auto pb-4 scrollbar-custom"
+            style={{ scrollbarWidth: "thin" }}
+          >
             {loading
               ? [...Array(4)].map((_, i) => (
                   <div
                     key={i}
-                    className="h-60 bg-gray-200 animate-pulse rounded-lg"
+                    className="flex-shrink-0 w-64 h-80 bg-gray-50 border border-gray-100 rounded-lg animate-pulse"
                   />
                 ))
-              : vendors.slice(0, 4).map((vendor) => (
-                  <Card
-                    key={vendor.id}
-                    className="bg-white hover:shadow-lg transition-shadow"
-                  >
-                    <CardContent className="p-6 text-center">
-                      <div className="w-20 h-20 bg-gradient-to-br from-pink-100 to-purple-100 rounded-full mx-auto mb-4 flex items-center justify-center overflow-hidden">
-                        {vendor.logo_url ? (
-                          <Image
-                            src={vendor.logo_url}
-                            alt={vendor.name}
-                            width={80}
-                            height={80}
-                            className="object-cover"
-                          />
-                        ) : (
-                          <ShoppingBag className="h-10 w-10 text-pink-500" />
-                        )}
-                      </div>
-                      <h3 className="font-semibold text-gray-800 mb-2">
-                        {vendor.name}
-                      </h3>
-                      <div className="flex items-center justify-center gap-1 mb-2">
-                        <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                        <span className="text-sm font-medium">
-                          {vendor.rating?.toFixed(1) || "4.5"}
-                        </span>
-                      </div>
-                      <p className="text-sm text-gray-600 mb-4">
-                        {vendor.totalProducts || vendor.product_count || 0}{" "}
-                        Products
-                      </p>
-                      <Button
-                        size="sm"
-                        onClick={() =>
-                          router.push(
-                            `/vendors/${encodeURIComponent(vendor.name)}`,
-                          )
-                        }
-                        className="w-full bg-primary hover:bg-primary/90 text-white"
-                      >
-                        View Store
-                      </Button>
-                    </CardContent>
-                  </Card>
-                ))}
-            {!loading && vendors.length === 0 && (
-              <div className="col-span-full text-center py-8 text-gray-500">
-                No vendors available at the moment. Check back soon!
-              </div>
-            )}
+              : vendors.slice(0, 4).map((vendor, index) => {
+                  const badges = [
+                    "Top Seller",
+                    "Gift Expert",
+                    "Fast Shipping",
+                    "Local Business",
+                  ];
+                  return (
+                    <Card
+                      key={vendor.id}
+                      className="flex-shrink-0 w-64 bg-white hover:shadow-lg transition-shadow border border-gray-200"
+                    >
+                      <CardContent className="p-6 text-center">
+                        {/* Vendor Logo with Verification Badge */}
+                        <div className="relative w-20 h-20 mx-auto mb-4">
+                          <div className="w-20 h-20 bg-gradient-to-br from-pink-100 to-purple-100 rounded-full flex items-center justify-center overflow-hidden">
+                            {vendor.logo_url ? (
+                              <Image
+                                src={vendor.logo_url}
+                                alt={vendor.name}
+                                width={80}
+                                height={80}
+                                className="object-cover"
+                              />
+                            ) : (
+                              <ShoppingBag className="h-10 w-10 text-pink-500" />
+                            )}
+                          </div>
+                          {/* Verification Checkmark */}
+                          <div className="absolute -bottom-1 -right-1 bg-red-500 rounded-full p-1">
+                            <CheckCircle2 className="h-4 w-4 text-white" />
+                          </div>
+                        </div>
+
+                        {/* Vendor Name */}
+                        <h3 className="font-bold text-gray-800 mb-1">
+                          {vendor.name}
+                        </h3>
+
+                        {/* Category */}
+                        <p className="text-sm text-gray-500 mb-3">
+                          {vendor.category || "General"}
+                        </p>
+
+                        {/* Rating and Items */}
+                        <div className="flex items-center justify-center gap-2 mb-3">
+                          <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                          <span className="text-sm font-medium text-gray-700">
+                            {vendor.rating?.toFixed(1) || "4.5"}
+                          </span>
+                          <span className="text-sm text-gray-500">•</span>
+                          <span className="text-sm text-gray-500">
+                            {vendor.totalProducts || vendor.product_count || 0}{" "}
+                            items
+                          </span>
+                        </div>
+
+                        {/* Yellow Badge */}
+                        <div className="mt-4">
+                          <span className="inline-block bg-yellow-100 text-yellow-800 text-xs font-medium px-3 py-1 rounded-full">
+                            {badges[index % badges.length]}
+                          </span>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
           </div>
+
+          {!loading && vendors.length === 0 && (
+            <div className="text-center py-8 text-gray-500">
+              No vendors available at the moment. Check back soon!
+            </div>
+          )}
         </div>
       </section>
 
@@ -835,30 +900,199 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* CTA Section */}
-      <section className="py-16 bg-white">
+      {/* Trusted by Leading Brands Section */}
+      <section className="py-12 bg-[#FAF7F6]">
         <div className="container mx-auto px-4">
-          <div className="max-w-3xl mx-auto text-center">
-            <h2 className="text-3xl font-bold text-gray-800 mb-4">
+          <div className="max-w-6xl mx-auto text-center">
+            {/* Heading */}
+            <h2 className="text-2xl md:text-3xl font-bold text-gray-800 mb-10">
+              Trusted by leading brands with GiftyZel Checkout
+            </h2>
+
+            {/* Brand Logos */}
+            <div className="flex flex-wrap items-center justify-center gap-8 md:gap-12 mb-8">
+              {[
+                { name: "Samsung", icon: "/collabBrand/samsung.png" },
+                { name: "Best Buy", icon: "/collabBrand/best-buy-icon.png" },
+                { name: "Nordstrom", icon: "/collabBrand/nordstrom.png" },
+                { name: "Sephora", icon: "/collabBrand/sephora.png" },
+                { name: "Williams Sonoma", icon: "/collabBrand/ws.png" },
+              ].map((brand) => (
+                <div
+                  key={brand.name}
+                  className="flex flex-col items-center gap-3 text-gray-600"
+                >
+                  <Image
+                    src={brand.icon}
+                    alt={brand.name}
+                    width={64}
+                    height={64}
+                    className="object-contain"
+                  />
+                  <span className="text-sm md:text-base font-normal text-center">
+                    {brand.name}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            {/* Concluding Text */}
+            <p className="text-xs md:text-sm text-gray-500 font-normal">
+              + 500 more retailers using GiftyZel checkout
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* CTA Section */}
+      <section className="py-16 bg-[#FAF7F6]">
+        <div className="container mx-auto px-4">
+          <div className="max-w-5xl mx-auto">
+            <h2 className="text-3xl font-bold text-gray-800 mb-12 text-center">
               Ready to Create Your Own Success Story?
             </h2>
-            <p className="text-gray-600 mb-8">
-              Join thousands of happy users who are making gifting effortless
-              and meaningful.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button
-                onClick={() => router.push("/marketplace")}
-                className="bg-primary hover:bg-primary/90 text-white rounded-full px-8 py-6 h-auto text-lg"
-              >
-                Start Gifting Now
-              </Button>
-              <Button
-                onClick={() => setIsAuthModalOpen(true)}
-                className="bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 rounded-full px-8 py-6 h-auto text-lg"
-              >
-                Register as Vendor
-              </Button>
+            
+            {/* Cards Container */}
+            <div className="flex flex-col md:flex-row gap-6">
+                {/* Sell on GiftyZel Card */}
+                <Card className="flex-1 bg-white border-0 shadow-sm">
+                  <CardContent className="p-8">
+                    {/* Icon */}
+                    <div className="w-12 h-12 bg-pink-100 rounded-lg flex items-center justify-center mb-4">
+                      <FileText className="h-6 w-6 text-red-500" />
+                    </div>
+
+                    {/* Heading */}
+                    <h3 className="text-xl font-bold text-gray-800 mb-2">
+                      Sell on GiftyZel
+                    </h3>
+
+                    {/* Description */}
+                    <p className="text-sm text-gray-600 mb-4">
+                      List your products & services on our marketplace. Reach millions of gift-givers.
+                    </p>
+
+                    {/* Features */}
+                    <div className="flex flex-wrap gap-2 mb-6">
+                      <span className="bg-gray-100 text-gray-700 text-xs font-medium px-3 py-1 rounded-full">
+                        7.5% commission
+                      </span>
+                      <span className="bg-gray-100 text-gray-700 text-xs font-medium px-3 py-1 rounded-full">
+                        No monthly fees
+                      </span>
+                    </div>
+
+                    {/* Button */}
+                    <Button
+                      onClick={() => setIsAuthModalOpen(true)}
+                      className="w-full bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600 text-white rounded-lg px-6 py-3 h-auto"
+                    >
+                      Apply to Sell
+                    </Button>
+                  </CardContent>
+                </Card>
+
+                {/* Add Gifting to Your Store Card */}
+                <Card className="flex-1 bg-white border-0 shadow-sm">
+                  <CardContent className="p-8">
+                    {/* Icon */}
+                    <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mb-4">
+                      <Plug className="h-6 w-6 text-purple-600" />
+                    </div>
+
+                    {/* Heading */}
+                    <h3 className="text-xl font-bold text-gray-800 mb-2">
+                      Add Gifting to Your Store
+                    </h3>
+
+                    {/* Description */}
+                    <p className="text-sm text-gray-600 mb-4">
+                      Install our plugin on your existing website. Let customers gift your products.
+                    </p>
+
+                    {/* Features */}
+                    <div className="flex flex-wrap gap-2 mb-6">
+                      <span className="bg-gray-100 text-gray-700 text-xs font-medium px-3 py-1 rounded-full">
+                        3.5% transaction fee
+                      </span>
+                      <span className="bg-gray-100 text-gray-700 text-xs font-medium px-3 py-1 rounded-full">
+                        10-min setup
+                      </span>
+                    </div>
+
+                    {/* Button */}
+                    <Button
+                      onClick={() => router.push("/marketplace")}
+                      className="w-full bg-pink-50 hover:bg-pink-100 text-pink-700 border border-pink-200 rounded-lg px-6 py-3 h-auto"
+                    >
+                      Get the Plugin
+                    </Button>
+                  </CardContent>
+                </Card>
+              </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Security & Trust Badges Section */}
+      <section className="py-10 bg-gray-50/50 border-t border-gray-100">
+        <div className="container mx-auto px-4">
+          <div className="flex flex-wrap items-center justify-center gap-6 md:gap-8">
+            {/* Privacy Protected Badge */}
+            <div className="flex flex-col items-center gap-2 text-gray-600 hover:text-gray-800 transition-colors">
+              <Image
+                src="/privacy.png"
+                alt="Privacy Protected"
+                width={40}
+                height={40}
+                className="object-contain"
+              />
+              <span className="text-xs md:text-sm font-medium text-center">Privacy Protected</span>
+            </div>
+
+            {/* Divider */}
+            <div className="hidden md:block w-px h-12 bg-gray-200 self-stretch" />
+
+            {/* Powered by Stripe */}
+            <div className="flex flex-col items-center gap-2 text-gray-600 hover:text-gray-800 transition-colors">
+              <Image
+                src="/stripe.png"
+                alt="Powered by Stripe"
+                width={40}
+                height={40}
+                className="object-contain"
+              />
+              <span className="text-xs md:text-sm font-medium text-center">Powered by Stripe</span>
+            </div>
+
+            {/* Divider */}
+            <div className="hidden md:block w-px h-12 bg-gray-200 self-stretch" />
+
+            {/* Secure Payments */}
+            <div className="flex flex-col items-center gap-2 text-gray-600 hover:text-gray-800 transition-colors">
+              <Image
+                src="/secure-payment.png"
+                alt="Secure Payments"
+                width={40}
+                height={40}
+                className="object-contain"
+              />
+              <span className="text-xs md:text-sm font-medium text-center">Secure Payments</span>
+            </div>
+
+            {/* Divider */}
+            <div className="hidden md:block w-px h-12 bg-gray-200 self-stretch" />
+
+            {/* SSL Encrypted */}
+            <div className="flex flex-col items-center gap-2 text-gray-600 hover:text-gray-800 transition-colors">
+              <Image
+                src="/ssl-certificate.png"
+                alt="SSL Encrypted"
+                width={40}
+                height={40}
+                className="object-contain"
+              />
+              <span className="text-xs md:text-sm font-medium text-center">SSL Encrypted</span>
             </div>
           </div>
         </div>

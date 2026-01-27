@@ -69,6 +69,7 @@ interface Service {
   image_url: string;
   location?: string;
   duration_hours?: number;
+  rating?: number;
 }
 
 interface Vendor {
@@ -79,6 +80,7 @@ interface Vendor {
   rating?: number;
   totalProducts?: number;
   product_count?: number;
+  category?: string;
 }
 
 const categories: Category[] = [

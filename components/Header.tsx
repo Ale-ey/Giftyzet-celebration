@@ -392,155 +392,210 @@ export default function Header() {
           </div>
         </div>
 
-        {/* Mobile Menu */}
+        {/* Mobile Sidebar */}
         {isMenuOpen && (
-          <div className="md:hidden mt-4 pb-4 border-t border-border pt-4 animate-in fade-in duration-200">
-            <nav className="flex flex-col space-y-2">
-              <Link href="/marketplace" onClick={() => setIsMenuOpen(false)}>
+          <>
+            {/* Overlay */}
+            <div
+              className="fixed inset-0 bg-black/50 z-40 md:hidden"
+              onClick={() => setIsMenuOpen(false)}
+            />
+            {/* Sidebar */}
+            <div className="fixed top-0 right-0 h-full w-80 bg-white shadow-xl z-50 md:hidden overflow-y-auto animate-in slide-in-from-right duration-300">
+              <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+                <h2 className="text-lg font-bold text-gray-900">Menu</h2>
                 <Button
                   variant="ghost"
-                  className="justify-start w-full text-gray-900 hover:text-primary hover:bg-primary/10 transition-colors"
+                  size="sm"
+                  onClick={() => setIsMenuOpen(false)}
+                  className="p-2"
                 >
-                  <ShoppingBag className="h-4 w-4 mr-2" />
-                  Marketplace
+                  <X className="h-5 w-5" />
                 </Button>
-              </Link>
-              <Link href="/vendors" onClick={() => setIsMenuOpen(false)}>
-                <Button
-                  variant="ghost"
-                  className="justify-start w-full text-gray-900 hover:text-primary hover:bg-primary/10 transition-colors"
-                >
-                  <Store className="h-4 w-4 mr-2" />
-                  Top Vendors
-                </Button>
-              </Link>
-              <Link href="/services" onClick={() => setIsMenuOpen(false)}>
-                <Button
-                  variant="ghost"
-                  className="justify-start w-full text-gray-900 hover:text-primary hover:bg-primary/10 transition-colors"
-                >
-                  <Wrench className="h-4 w-4 mr-2" />
-                  Services
-                </Button>
-              </Link>
-              <Link href="/overview" onClick={() => setIsMenuOpen(false)}>
-                <Button
-                  variant="ghost"
-                  className="justify-start w-full text-gray-900 hover:text-primary hover:bg-primary/10 transition-colors"
-                >
-                  <Info className="h-4 w-4 mr-2" />
-                  Overview
-                </Button>
-              </Link>
+              </div>
+              <nav className="flex flex-col p-4 space-y-2">
+                <Link href="/marketplace" onClick={() => setIsMenuOpen(false)}>
+                  <Button
+                    variant="ghost"
+                    className="justify-start w-full text-gray-900 hover:text-primary hover:bg-primary/10 transition-colors"
+                  >
+                    <ShoppingBag className="h-4 w-4 mr-2" />
+                    Marketplace
+                  </Button>
+                </Link>
+                <Link href="/vendors" onClick={() => setIsMenuOpen(false)}>
+                  <Button
+                    variant="ghost"
+                    className="justify-start w-full text-gray-900 hover:text-primary hover:bg-primary/10 transition-colors"
+                  >
+                    <Store className="h-4 w-4 mr-2" />
+                    Top Vendors
+                  </Button>
+                </Link>
+                <Link href="/services" onClick={() => setIsMenuOpen(false)}>
+                  <Button
+                    variant="ghost"
+                    className="justify-start w-full text-gray-900 hover:text-primary hover:bg-primary/10 transition-colors"
+                  >
+                    <Wrench className="h-4 w-4 mr-2" />
+                    Services
+                  </Button>
+                </Link>
+                <Link href="/overview" onClick={() => setIsMenuOpen(false)}>
+                  <Button
+                    variant="ghost"
+                    className="justify-start w-full text-gray-900 hover:text-primary hover:bg-primary/10 transition-colors"
+                  >
+                    <Info className="h-4 w-4 mr-2" />
+                    Overview
+                  </Button>
+                </Link>
 
-              <div className="pt-2 flex flex-col space-y-2 border-t border-border">
-                {isLoggedIn ? (
-                  <>
-                    <div className="px-2 py-1.5 text-sm text-muted-foreground flex items-center">
-                      <User className="h-4 w-4 mr-2" />
-                      <span className="truncate">{userEmail}</span>
-                    </div>
-                    <Link href="/profile" onClick={() => setIsMenuOpen(false)}>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="w-full justify-start text-gray-900 hover:text-primary hover:bg-primary/10 transition-colors"
-                      >
-                        <Settings className="h-4 w-4 mr-2" />
-                        Profile
-                      </Button>
-                    </Link>
-                    <Link href="/wishlist" onClick={() => setIsMenuOpen(false)}>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="w-full justify-start text-gray-900 hover:text-primary hover:bg-primary/10 transition-colors"
-                      >
-                        <Heart className="h-4 w-4 mr-2" />
-                        Wishlist
-                      </Button>
-                    </Link>
-                    <Link href="/contacts" onClick={() => setIsMenuOpen(false)}>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="w-full justify-start text-gray-900 hover:text-primary hover:bg-primary/10 transition-colors"
-                      >
-                        <Users className="h-4 w-4 mr-2" />
-                        My Contacts
-                      </Button>
-                    </Link>
-                    <Link
-                      href="/my-bookings"
-                      onClick={() => setIsMenuOpen(false)}
-                    >
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="w-full justify-start text-gray-900 hover:text-primary hover:bg-primary/10 transition-colors"
-                      >
-                        <Settings className="h-4 w-4 mr-2" />
-                        My Bookings
-                      </Button>
-                    </Link>
-                    {userRole === "vendor" && (
-                      <Link href="/vendor" onClick={() => setIsMenuOpen(false)}>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="w-full justify-start text-gray-900 hover:text-primary hover:bg-primary/10 transition-colors"
-                        >
-                          <Store className="h-4 w-4 mr-2" />
-                          Vendor Dashboard
-                        </Button>
-                      </Link>
+                <div className="pt-4 flex flex-col space-y-2 border-t border-gray-200">
+                  {/* Cart */}
+                  <Button
+                    variant="ghost"
+                    className="justify-start w-full text-gray-900 hover:text-primary hover:bg-primary/10 transition-colors"
+                    onClick={() => {
+                      setIsCartOpen(true);
+                      setIsMenuOpen(false);
+                    }}
+                  >
+                    <ShoppingCart className="h-4 w-4 mr-2" />
+                    Cart
+                    {cartCount > 0 && (
+                      <span className="ml-auto bg-primary text-primary-foreground text-xs rounded-full px-2 py-0.5 font-semibold">
+                        {cartCount > 99 ? "99+" : cartCount}
+                      </span>
                     )}
-                    {userRole === "admin" && (
-                      <Link href="/admin" onClick={() => setIsMenuOpen(false)}>
+                  </Button>
+
+                  {/* Notifications */}
+                  {isLoggedIn && (
+                    <Button
+                      variant="ghost"
+                      className="justify-start w-full text-gray-900 hover:text-primary hover:bg-primary/10 transition-colors"
+                      onClick={() => {
+                        router.push("/notifications");
+                        setIsMenuOpen(false);
+                      }}
+                    >
+                      <Bell className="h-4 w-4 mr-2" />
+                      Notifications
+                      <span className="ml-auto bg-destructive text-destructive-foreground text-xs rounded-full px-2 py-0.5">
+                        3
+                      </span>
+                    </Button>
+                  )}
+
+                  {isLoggedIn ? (
+                    <>
+                      <div className="px-2 py-1.5 text-sm text-gray-600 flex items-center border-t border-gray-200 mt-2 pt-4">
+                        <User className="h-4 w-4 mr-2" />
+                        <span className="truncate">{userEmail}</span>
+                      </div>
+                      <Link href="/profile" onClick={() => setIsMenuOpen(false)}>
                         <Button
                           variant="ghost"
                           size="sm"
                           className="w-full justify-start text-gray-900 hover:text-primary hover:bg-primary/10 transition-colors"
                         >
                           <Settings className="h-4 w-4 mr-2" />
-                          Admin Dashboard
+                          Profile
                         </Button>
                       </Link>
-                    )}
+                      <Link href="/wishlist" onClick={() => setIsMenuOpen(false)}>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="w-full justify-start text-gray-900 hover:text-primary hover:bg-primary/10 transition-colors"
+                        >
+                          <Heart className="h-4 w-4 mr-2" />
+                          Wishlist
+                        </Button>
+                      </Link>
+                      <Link href="/contacts" onClick={() => setIsMenuOpen(false)}>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="w-full justify-start text-gray-900 hover:text-primary hover:bg-primary/10 transition-colors"
+                        >
+                          <Users className="h-4 w-4 mr-2" />
+                          My Contacts
+                        </Button>
+                      </Link>
+                      <Link
+                        href="/my-bookings"
+                        onClick={() => setIsMenuOpen(false)}
+                      >
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="w-full justify-start text-gray-900 hover:text-primary hover:bg-primary/10 transition-colors"
+                        >
+                          <Settings className="h-4 w-4 mr-2" />
+                          My Bookings
+                        </Button>
+                      </Link>
+                      {userRole === "vendor" && (
+                        <Link href="/vendor" onClick={() => setIsMenuOpen(false)}>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="w-full justify-start text-gray-900 hover:text-primary hover:bg-primary/10 transition-colors"
+                          >
+                            <Store className="h-4 w-4 mr-2" />
+                            Vendor Dashboard
+                          </Button>
+                        </Link>
+                      )}
+                      {userRole === "admin" && (
+                        <Link href="/admin" onClick={() => setIsMenuOpen(false)}>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="w-full justify-start text-gray-900 hover:text-primary hover:bg-primary/10 transition-colors"
+                          >
+                            <Settings className="h-4 w-4 mr-2" />
+                            Admin Dashboard
+                          </Button>
+                        </Link>
+                      )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleSignOutClick}
+                        disabled={signingOut}
+                        className="w-full justify-start text-gray-900 hover:text-primary hover:border-primary transition-colors mt-2"
+                      >
+                        <LogOut className="h-4 w-4 mr-2" />
+                        Sign Out
+                      </Button>
+                    </>
+                  ) : (
                     <Button
-                      variant="outline"
+                      variant="ghost"
                       size="sm"
-                      onClick={handleSignOutClick}
-                      disabled={signingOut}
-                      className="w-full justify-start text-gray-900 hover:text-primary hover:border-primary transition-colors"
+                      className="w-full text-gray-900 hover:text-primary hover:bg-primary/10 transition-colors border-t border-gray-200 mt-2 pt-4"
+                      onClick={() => {
+                        setIsMenuOpen(false);
+                        setIsAuthModalOpen(true);
+                      }}
                     >
-                      <LogOut className="h-4 w-4 mr-2" />
-                      Sign Out
+                      <User className="h-4 w-4 mr-2" />
+                      Sign In
                     </Button>
-                  </>
-                ) : (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="w-full text-gray-900 hover:text-primary hover:bg-primary/10 transition-colors"
-                    onClick={() => {
-                      setIsMenuOpen(false);
-                      setIsAuthModalOpen(true);
-                    }}
-                  >
-                    <User className="h-4 w-4 mr-2" />
-                    Sign In
-                  </Button>
-                )}
-                <Link href="/marketplace" onClick={() => setIsMenuOpen(false)}>
-                  <Button className="bg-primary hover:bg-primary/90 text-primary-foreground w-full transition-colors">
-                    <Gift className="h-4 w-4 mr-2" />
-                    Start Gifting
-                  </Button>
-                </Link>
-              </div>
-            </nav>
-          </div>
+                  )}
+                  <Link href="/marketplace" onClick={() => setIsMenuOpen(false)}>
+                    <Button className="bg-primary hover:bg-primary/90 text-primary-foreground w-full transition-colors mt-2">
+                      <Gift className="h-4 w-4 mr-2" />
+                      Start Gifting
+                    </Button>
+                  </Link>
+                </div>
+              </nav>
+            </div>
+          </>
         )}
       </div>
 

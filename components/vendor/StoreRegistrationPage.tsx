@@ -1,8 +1,8 @@
 "use client"
 
 import { useEffect, useState, useRef } from "react"
-import { useRouter } from "next/navigation"
-import { Save, Upload, X, MapPin, Building2, Phone, Mail, Globe, FileText } from "lucide-react"
+import { useRouter, useSearchParams } from "next/navigation"
+import { Save, Upload, X, MapPin, Building2, Phone, Mail, Globe, FileText, CreditCard, CheckCircle2 } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -11,6 +11,7 @@ import { getCurrentUser, getCurrentUserWithProfile } from "@/lib/api/auth"
 import { getVendorByUserId, getStoreByVendorId, createStore, updateStore, createVendor } from "@/lib/api/vendors"
 import { uploadStoreLogo } from "@/lib/api/storage"
 import { useToast } from "@/components/ui/toast"
+import { supabase } from "@/lib/supabase/client"
 
 export default function StoreRegistrationPage() {
   const router = useRouter()
@@ -20,9 +21,12 @@ export default function StoreRegistrationPage() {
   const [vendorId, setVendorId] = useState<string | null>(null)
   const [storeId, setStoreId] = useState<string | null>(null)
   const [storeStatus, setStoreStatus] = useState<string | null>(null)
+  const [stripeConnected, setStripeConnected] = useState(false)
+  const [stripeConnecting, setStripeConnecting] = useState(false)
   const [logoPreview, setLogoPreview] = useState<string>("")
   const [logoFile, setLogoFile] = useState<File | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const searchParams = useSearchParams()
   const [formData, setFormData] = useState({
     name: "",
     description: "",
@@ -37,6 +41,35 @@ export default function StoreRegistrationPage() {
   useEffect(() => {
     loadVendorAndStore()
   }, [])
+
+  // Handle return from Stripe Connect onboarding
+  useEffect(() => {
+    const stripeComplete = searchParams.get("stripe") === "complete"
+    const storeIdParam = searchParams.get("store_id")
+    if (!stripeComplete || !storeIdParam) return
+
+    const completeOnboarding = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session?.access_token) return
+        const res = await fetch(
+          `/api/stripe/connect/complete?store_id=${encodeURIComponent(storeIdParam)}`,
+          {
+            method: "POST",
+            headers: { Authorization: `Bearer ${session.access_token}` },
+          }
+        )
+        if (res.ok) {
+          setStripeConnected(true)
+          showToast("Stripe account connected. You can receive payouts after orders are delivered.", "success")
+          router.replace("/vendor/register-store", { scroll: false })
+        }
+      } catch (e) {
+        console.error("Stripe complete error:", e)
+      }
+    }
+    completeOnboarding()
+  }, [searchParams, router, showToast])
 
   const loadVendorAndStore = async () => {
     try {
@@ -78,6 +111,7 @@ export default function StoreRegistrationPage() {
         if (store) {
           setStoreId(store.id)
           setStoreStatus(store.status)
+          setStripeConnected(!!(store as any).stripe_onboarding_complete || !!(store as any).stripe_account_id)
           setFormData({
             name: store.name || "",
             description: store.description || "",
@@ -134,6 +168,45 @@ export default function StoreRegistrationPage() {
       setLogoPreview(reader.result as string)
     }
     reader.readAsDataURL(file)
+  }
+
+  const handleConnectStripe = async () => {
+    if (!storeId) {
+      showToast("Save your store first, then connect Stripe.", "info")
+      return
+    }
+    setStripeConnecting(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.access_token) {
+        showToast("Please sign in to connect Stripe.", "error")
+        setStripeConnecting(false)
+        return
+      }
+      const res = await fetch("/api/stripe/connect/onboard", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ storeId }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        showToast(data.error || "Failed to start Stripe setup.", "error")
+        setStripeConnecting(false)
+        return
+      }
+      if (data.url) {
+        window.location.href = data.url
+        return
+      }
+      setStripeConnecting(false)
+    } catch (e) {
+      console.error("Connect Stripe error:", e)
+      showToast("Something went wrong. Please try again.", "error")
+      setStripeConnecting(false)
+    }
   }
 
   const handleRemoveLogo = () => {
@@ -431,6 +504,40 @@ export default function StoreRegistrationPage() {
                     className="bg-white border-gray-200 text-gray-900"
                   />
                 </div>
+
+                {/* Stripe payout account */}
+                {storeId && (
+                  <Card className="border border-gray-200 bg-gray-50">
+                    <CardHeader>
+                      <CardTitle className="text-gray-900 flex items-center gap-2 text-base">
+                        <CreditCard className="h-4 w-4" />
+                        Stripe payout account
+                      </CardTitle>
+                      <CardDescription className="text-gray-600">
+                        Connect your Stripe account to receive payouts. After an order is marked delivered, your share (after platform commission) is transferred to your Stripe account 7 days later.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      {stripeConnected ? (
+                        <div className="flex items-center gap-2 text-green-700">
+                          <CheckCircle2 className="h-5 w-5" />
+                          <span className="font-medium">Stripe account connected</span>
+                        </div>
+                      ) : (
+                        <Button
+                          type="button"
+                          onClick={handleConnectStripe}
+                          disabled={stripeConnecting}
+                          variant="outline"
+                          className="border-gray-300 bg-white text-gray-700"
+                        >
+                          <CreditCard className="h-4 w-4 mr-2" />
+                          {stripeConnecting ? "Redirecting..." : "Connect Stripe account"}
+                        </Button>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
 
                 {/* Store Logo */}
                 <div className="space-y-2">

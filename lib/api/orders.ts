@@ -216,8 +216,10 @@ export async function updateVendorOrderStatus(orderId: string, vendorId: string,
   const updateData: any = { status }
   
   if (status === 'dispatched') {
-    // Also update main order if all vendor orders are dispatched
     updateData.dispatched_at = new Date().toISOString()
+  }
+  if (status === 'delivered') {
+    updateData.delivered_at = new Date().toISOString()
   }
 
   const { data, error } = await supabase
@@ -233,6 +235,9 @@ export async function updateVendorOrderStatus(orderId: string, vendorId: string,
   // Update main order status if needed
   if (status === 'dispatched') {
     await updateOrderStatus(orderId, 'dispatched')
+  }
+  if (status === 'delivered') {
+    await updateOrderStatus(orderId, 'delivered')
   }
 
   return data

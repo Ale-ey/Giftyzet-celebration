@@ -2,18 +2,27 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 import { 
   Store, 
   CheckCircle2, 
   XCircle, 
   Clock,
   AlertCircle,
-  Ban
+  Ban,
+  Percent,
+  Wallet,
+  Video,
+  Gift,
+  Store as StoreIcon,
+  MessageSquare
 } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { Input } from "@/components/ui/input"
 import { getCurrentUserWithProfile, getCurrentUser } from "@/lib/api/auth"
+import { supabase } from "@/lib/supabase/client"
 import { 
   getPendingStores as getApiPendingStores,
   getAllApprovedStores,
@@ -34,6 +43,15 @@ export default function AdminDashboard() {
   const [orders, setOrders] = useState<Order[]>([])
   const [currentPage, setCurrentPage] = useState(1)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
+  const [commissionPercent, setCommissionPercent] = useState<string>("10")
+  const [commissionLoading, setCommissionLoading] = useState(false)
+  const [commissionSaving, setCommissionSaving] = useState(false)
+  const [processPayoutsLoading, setProcessPayoutsLoading] = useState(false)
+  const [payoutMessage, setPayoutMessage] = useState<string | null>(null)
+  const [giftingVideoUrl, setGiftingVideoUrl] = useState("")
+  const [vendorVideoUrl, setVendorVideoUrl] = useState("")
+  const [overviewVideosLoading, setOverviewVideosLoading] = useState(false)
+  const [overviewVideosSaving, setOverviewVideosSaving] = useState(false)
   const itemsPerPage = 6
 
   useEffect(() => {
@@ -65,6 +83,45 @@ export default function AdminDashboard() {
     if (typeof window === "undefined" || !isAuthorized) return
 
     loadStoresData()
+  }, [isAuthorized])
+
+  useEffect(() => {
+    if (!isAuthorized) return
+    const loadCommission = async () => {
+      setCommissionLoading(true)
+      try {
+        const res = await fetch("/api/admin/commission")
+        const data = await res.json()
+        if (res.ok && data.commission_percent != null) {
+          setCommissionPercent(String(data.commission_percent))
+        }
+      } catch (e) {
+        console.error("Load commission error:", e)
+      } finally {
+        setCommissionLoading(false)
+      }
+    }
+    loadCommission()
+  }, [isAuthorized])
+
+  useEffect(() => {
+    if (!isAuthorized) return
+    const loadOverviewVideos = async () => {
+      setOverviewVideosLoading(true)
+      try {
+        const res = await fetch("/api/admin/overview-videos")
+        const data = await res.json()
+        if (res.ok) {
+          setGiftingVideoUrl(data.giftingVideoUrl ?? "")
+          setVendorVideoUrl(data.vendorVideoUrl ?? "")
+        }
+      } catch (e) {
+        console.error("Load overview videos error:", e)
+      } finally {
+        setOverviewVideosLoading(false)
+      }
+    }
+    loadOverviewVideos()
   }, [isAuthorized])
 
   const loadStoresData = async () => {
@@ -146,6 +203,92 @@ export default function AdminDashboard() {
     }
   }
 
+  const getAuthHeaders = async () => {
+    const { data: { session } } = await supabase.auth.getSession()
+    return {
+      "Content-Type": "application/json",
+      ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+    }
+  }
+
+  const handleSaveCommission = async () => {
+    const value = parseFloat(commissionPercent)
+    if (isNaN(value) || value < 0 || value > 100) {
+      alert("Commission must be between 0 and 100")
+      return
+    }
+    setCommissionSaving(true)
+    try {
+      const headers = await getAuthHeaders()
+      const res = await fetch("/api/admin/commission", {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({ commission_percent: value }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        alert(data.error || "Failed to save commission")
+        return
+      }
+      alert("Commission updated successfully.")
+    } catch (e) {
+      console.error("Save commission error:", e)
+      alert("Failed to save commission.")
+    } finally {
+      setCommissionSaving(false)
+    }
+  }
+
+  const handleProcessPayouts = async () => {
+    setProcessPayoutsLoading(true)
+    setPayoutMessage(null)
+    try {
+      const headers = await getAuthHeaders()
+      const res = await fetch("/api/admin/process-payouts", { method: "POST", headers })
+      const data = await res.json()
+      if (!res.ok) {
+        setPayoutMessage(data.error || "Failed to process payouts")
+        return
+      }
+      setPayoutMessage(
+        data.processed > 0
+          ? `Processed ${data.processed} payout(s).${data.errors?.length ? " Some errors: " + data.errors.join("; ") : ""}`
+          : data.message || "No payouts due."
+      )
+    } catch (e) {
+      console.error("Process payouts error:", e)
+      setPayoutMessage("Failed to process payouts.")
+    } finally {
+      setProcessPayoutsLoading(false)
+    }
+  }
+
+  const handleSaveOverviewVideos = async () => {
+    setOverviewVideosSaving(true)
+    try {
+      const headers = await getAuthHeaders()
+      const res = await fetch("/api/admin/overview-videos", {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({
+          giftingVideoUrl: giftingVideoUrl.trim() || null,
+          vendorVideoUrl: vendorVideoUrl.trim() || null,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        alert(data.error || "Failed to save overview videos")
+        return
+      }
+      alert("Overview videos saved.")
+    } catch (e) {
+      console.error("Save overview videos error:", e)
+      alert("Failed to save overview videos.")
+    } finally {
+      setOverviewVideosSaving(false)
+    }
+  }
+
   if (!isAuthorized || loading) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
@@ -174,9 +317,17 @@ export default function AdminDashboard() {
   return (
     <div className="min-h-screen bg-white">
       <div className="container mx-auto px-4 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Admin Dashboard</h1>
-          <p className="text-gray-600">Manage vendors, stores, and monitor platform activity</p>
+        <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Admin Dashboard</h1>
+            <p className="text-gray-600">Manage vendors, stores, and monitor platform activity</p>
+          </div>
+          <Link href="/admin/contact-queries">
+            <Button variant="outline" className="border-gray-300 bg-white text-gray-700 hover:bg-gray-50 gap-2">
+              <MessageSquare className="h-4 w-4" />
+              Contact Queries
+            </Button>
+          </Link>
         </div>
 
         {/* Stats */}
@@ -214,6 +365,113 @@ export default function AdminDashboard() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Commission & Payouts */}
+        <Card className="mb-8 border border-gray-200 bg-white">
+          <CardHeader>
+            <CardTitle className="text-gray-900 flex items-center gap-2">
+              <Percent className="h-5 w-5" />
+              Commission & Payouts
+            </CardTitle>
+            <CardDescription className="text-gray-600">
+              Set platform commission (%). Vendors receive payouts 7 days after order is marked delivered. Process payouts to transfer funds to vendor Stripe accounts.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex flex-wrap items-center gap-4">
+              <div className="flex items-center gap-2">
+                <label htmlFor="commission" className="text-sm font-medium text-gray-700">
+                  Commission %
+                </label>
+                <Input
+                  id="commission"
+                  type="number"
+                  min={0}
+                  max={100}
+                  step={0.5}
+                  value={commissionPercent}
+                  onChange={(e) => setCommissionPercent(e.target.value)}
+                  disabled={commissionLoading}
+                  className="w-24"
+                />
+              </div>
+              <Button
+                onClick={handleSaveCommission}
+                disabled={commissionSaving || commissionLoading}
+                variant="outline"
+                className="border-gray-300 bg-white text-gray-700"
+              >
+                {commissionSaving ? "Saving..." : "Save"}
+              </Button>
+            </div>
+            <div className="flex items-center gap-4">
+              <Button
+                onClick={handleProcessPayouts}
+                disabled={processPayoutsLoading}
+                className="bg-primary hover:bg-primary/90 text-white"
+              >
+                <Wallet className="h-4 w-4 mr-2" />
+                {processPayoutsLoading ? "Processing..." : "Process Payouts"}
+              </Button>
+              {payoutMessage && (
+                <span className="text-sm text-gray-600">{payoutMessage}</span>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Overview Videos */}
+        <Card className="mb-8 border border-gray-200 bg-white">
+          <CardHeader>
+            <CardTitle className="text-gray-900 flex items-center gap-2">
+              <Video className="h-5 w-5" />
+              Overview Tab Videos
+            </CardTitle>
+            <CardDescription className="text-gray-600">
+              Set Google Drive (or other) video links for the Overview page. One link for &quot;How to Send Gifts&quot; and one for &quot;How to Register as Vendor&quot;. Paste the share link (e.g. https://drive.google.com/file/d/.../view).
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <label htmlFor="gifting-video" className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                <Gift className="h-4 w-4" />
+                How to Send Gifts – video link
+              </label>
+              <Input
+                id="gifting-video"
+                type="url"
+                placeholder="https://drive.google.com/file/d/.../view?usp=sharing"
+                value={giftingVideoUrl}
+                onChange={(e) => setGiftingVideoUrl(e.target.value)}
+                disabled={overviewVideosLoading}
+                className="w-full"
+              />
+            </div>
+            <div className="space-y-2">
+              <label htmlFor="vendor-video" className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                <StoreIcon className="h-4 w-4" />
+                How to Register as Vendor – video link
+              </label>
+              <Input
+                id="vendor-video"
+                type="url"
+                placeholder="https://drive.google.com/file/d/.../view?usp=sharing"
+                value={vendorVideoUrl}
+                onChange={(e) => setVendorVideoUrl(e.target.value)}
+                disabled={overviewVideosLoading}
+                className="w-full"
+              />
+            </div>
+            <Button
+              onClick={handleSaveOverviewVideos}
+              disabled={overviewVideosSaving || overviewVideosLoading}
+              variant="outline"
+              className="border-gray-300 bg-white text-gray-700"
+            >
+              {overviewVideosSaving ? "Saving..." : "Save Overview Videos"}
+            </Button>
+          </CardContent>
+        </Card>
 
         {/* Pending Store Approvals */}
         <div className="mb-8">

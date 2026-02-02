@@ -28,6 +28,8 @@ interface OrderConfirmationModalProps {
   onConfirm: (orderData: OrderData) => void
   cartItems: CartItem[]
   orderType: "self" | "gift"
+  /** Admin-configured tax %; if provided, order summary shows Subtotal, Shipping: Free, Tax, Total */
+  taxPercent?: number
 }
 
 export interface OrderData {
@@ -48,7 +50,8 @@ export default function OrderConfirmationModal({
   onClose,
   onConfirm,
   cartItems,
-  orderType
+  orderType,
+  taxPercent = undefined
 }: OrderConfirmationModalProps) {
   const { showToast } = useToast()
   const [isGiftToMyself, setIsGiftToMyself] = useState(true)
@@ -129,13 +132,21 @@ export default function OrderConfirmationModal({
     }
   }, [isOpen])
 
-  const calculateTotal = () => {
+  const calculateSubtotal = () => {
     return cartItems.reduce((total, item) => {
       const price = typeof item.price === 'string' 
         ? parseFloat(item.price.replace("$", ""))
         : parseFloat(String(item.price))
       return total + (isNaN(price) ? 0 : price) * item.quantity
     }, 0)
+  }
+
+  const calculateTotal = () => {
+    const subtotal = calculateSubtotal()
+    if (taxPercent == null) return subtotal
+    const shipping = 0
+    const tax = (subtotal * taxPercent) / 100
+    return subtotal + shipping + tax
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -218,6 +229,22 @@ export default function OrderConfirmationModal({
                   </div>
                 )
               })}
+              {taxPercent != null ? (
+                <>
+                  <div className="flex justify-between text-sm text-gray-600 pt-2">
+                    <span>Subtotal</span>
+                    <span>${calculateSubtotal().toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm text-gray-600">
+                    <span>Shipping</span>
+                    <span>Free</span>
+                  </div>
+                  <div className="flex justify-between text-sm text-gray-600">
+                    <span>Tax</span>
+                    <span>${((calculateSubtotal() * taxPercent) / 100).toFixed(2)}</span>
+                  </div>
+                </>
+              ) : null}
               <div className="border-t border-gray-200 pt-2 mt-2">
                 <div className="flex justify-between font-bold text-gray-900">
                   <span>Total</span>

@@ -81,6 +81,25 @@ export async function createOrder(orderData: CreateOrderData) {
 
   if (itemsError) throw itemsError
 
+  // Reduce product stock for each product item in the order
+  for (const item of orderData.items) {
+    if (item.product_id && item.quantity) {
+      const { data: product, error: fetchErr } = await supabase
+        .from('products')
+        .select('stock')
+        .eq('id', item.product_id)
+        .single()
+      if (!fetchErr && product != null) {
+        const currentStock = typeof product.stock === 'number' ? product.stock : parseInt(String(product.stock), 10) || 0
+        const newStock = Math.max(0, currentStock - item.quantity)
+        await supabase
+          .from('products')
+          .update({ stock: newStock })
+          .eq('id', item.product_id)
+      }
+    }
+  }
+
   // Create vendor orders (group by vendor/store)
   const vendorOrderMap = new Map<string, { vendorId: string; storeId: string }>()
 
@@ -212,12 +231,9 @@ export async function updateOrderStatus(orderId: string, status: 'pending' | 'co
 }
 
 // Update vendor order status
+// Note: vendor_orders has status and delivered_at only (no dispatched_at column); orders table has dispatched_at
 export async function updateVendorOrderStatus(orderId: string, vendorId: string, status: 'pending' | 'confirmed' | 'dispatched' | 'delivered' | 'cancelled') {
   const updateData: any = { status }
-  
-  if (status === 'dispatched') {
-    updateData.dispatched_at = new Date().toISOString()
-  }
   if (status === 'delivered') {
     updateData.delivered_at = new Date().toISOString()
   }

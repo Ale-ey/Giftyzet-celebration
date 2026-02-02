@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getServerUserAndRole } from "@/lib/supabase/server"
-import { supabase } from "@/lib/supabase/client"
+import { createServerSupabase, getServerUserAndRole } from "@/lib/supabase/server"
 
 export async function POST(req: NextRequest) {
   try {
@@ -15,6 +14,8 @@ export async function POST(req: NextRequest) {
     if (!storeId) {
       return NextResponse.json({ error: "store_id required" }, { status: 400 })
     }
+
+    const supabase = createServerSupabase(token)
 
     const { data: store } = await supabase
       .from("stores")

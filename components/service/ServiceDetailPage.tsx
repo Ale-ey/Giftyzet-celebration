@@ -7,12 +7,52 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
 import { getService } from "@/lib/api/products"
+import { getReviewsForService } from "@/lib/api/reviews"
 import { useToast } from "@/components/ui/toast"
+
+function ServiceReviews({ serviceId }: { serviceId: string }) {
+  const [reviews, setReviews] = useState<Array<{ id: string; rating: number; comment: string | null; created_at: string; users: { name: string | null } | null }>>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    getReviewsForService(serviceId)
+      .then(setReviews)
+      .catch(() => setReviews([]))
+      .finally(() => setLoading(false))
+  }, [serviceId])
+
+  if (loading) return <div className="text-sm text-gray-500 mt-4">Loading reviews...</div>
+  if (reviews.length === 0) return <div className="text-sm text-gray-500 mt-4">No reviews yet.</div>
+
+  return (
+    <Card className="border border-gray-200 bg-gray-50/50 mt-6">
+      <CardContent className="p-6">
+        <h3 className="font-semibold text-gray-700 mb-4">Customer Reviews</h3>
+        <div className="space-y-4">
+          {reviews.map((r) => (
+            <div key={r.id} className="border-b border-gray-100 pb-4 last:border-0 last:pb-0">
+              <div className="flex items-center gap-2 mb-1">
+                <div className="flex items-center gap-0.5">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <Star key={star} className={`h-4 w-4 ${star <= r.rating ? 'text-yellow-500 fill-yellow-500' : 'text-gray-300'}`} />
+                  ))}
+                </div>
+                <span className="text-sm font-medium text-gray-700">{r.users?.name ?? 'Customer'}</span>
+                <span className="text-xs text-gray-400">{new Date(r.created_at).toLocaleDateString()}</span>
+              </div>
+              {r.comment && <p className="text-sm text-gray-600 mt-1">{r.comment}</p>}
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
 
 export default function ServiceDetailPage({ serviceId }: { serviceId: string }) {
   const router = useRouter()
   const { showToast } = useToast()
-  const [quantity, setQuantity] = useState(1)
+  const [hours, setHours] = useState(1)
   const [selectedImageIndex, setSelectedImageIndex] = useState(0)
   const [service, setService] = useState<any>(null)
   const [loading, setLoading] = useState(true)
@@ -76,40 +116,33 @@ export default function ServiceDetailPage({ serviceId }: { serviceId: string }) 
     )
   }
 
+  const pricePerHour = typeof service.price === 'number' ? service.price : parseFloat(String(service.price)) || 0
+
   const handleAddToCart = () => {
     const cartItem = {
       id: service.id,
       name: service.name,
-      price: typeof service.price === 'number' ? `$${service.price}` : service.price,
+      price: pricePerHour,
       image: service.image_url,
       store_id: service.store_id,
-      type: 'service',
-      duration: service.duration,
+      category: service.category,
+      type: 'service' as const,
       location: service.location,
-      quantity
+      quantity: hours
     }
     
-    // Get existing cart
     const existingCart = JSON.parse(localStorage.getItem("cart") || "[]")
-    
-    // Check if service already exists in cart
     const existingItemIndex = existingCart.findIndex((item: any) => item.id === service.id && item.type === 'service')
     
     if (existingItemIndex >= 0) {
-      // Update quantity if already in cart
-      existingCart[existingItemIndex].quantity += quantity
+      existingCart[existingItemIndex].quantity += hours
     } else {
-      // Add new item to cart
       existingCart.push(cartItem)
     }
     
     localStorage.setItem("cart", JSON.stringify(existingCart))
-    
-    // Dispatch event to update cart count in header
     window.dispatchEvent(new Event("cartUpdated"))
-    
-    // Show success message
-    showToast(`Added ${quantity} ${quantity > 1 ? 'services' : 'service'} to cart!`, "success")
+    showToast(`Added ${hours} ${hours === 1 ? 'hour' : 'hours'} to cart!`, "success")
   }
 
   const handleSendGift = () => {
@@ -190,22 +223,29 @@ export default function ServiceDetailPage({ serviceId }: { serviceId: string }) 
               <Badge variant="outline" className="mb-3 border-gray-200 bg-white text-gray-600">
                 {service.category}
               </Badge>
-              <h1 className="text-4xl font-semibold text-gray-800 mb-4">{service.name}</h1>
-              
-              <p className="text-gray-500 mb-4">
-                by <span className="font-medium text-gray-700">
-                  {service.stores?.vendors?.vendor_name || service.stores?.name || 'Unknown Vendor'}
+              <h1 className="text-4xl font-semibold text-gray-800 mb-3">{service.name}</h1>
+
+              {/* Average rating under title */}
+              <div className="flex items-center gap-2 mb-4">
+                <div className="flex items-center gap-0.5">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <Star
+                      key={star}
+                      className={`h-5 w-5 ${star <= (service.rating ?? 0) ? 'text-yellow-500 fill-yellow-500' : 'text-gray-300'}`}
+                    />
+                  ))}
+                </div>
+                <span className="text-sm text-gray-600">
+                  {Number(service.rating ?? 0).toFixed(1)} · {(service.reviews_count ?? 0)} reviews
                 </span>
-              </p>
+              </div>
 
               {/* Service Specific Info */}
               <div className="flex items-center gap-4 mb-4">
-                {service.duration && (
-                  <div className="flex items-center text-gray-600">
-                    <Clock className="h-5 w-5 mr-2 text-gray-500" />
-                    <span className="text-sm font-medium">{service.duration}</span>
-                  </div>
-                )}
+                <div className="flex items-center text-gray-600">
+                  <Clock className="h-5 w-5 mr-2 text-gray-500" />
+                  <span className="text-sm font-medium">${pricePerHour.toFixed(2)} per hour</span>
+                </div>
                 {service.location && (
                   <div className="flex items-center text-gray-600">
                     <MapPin className="h-5 w-5 mr-2 text-gray-500" />
@@ -226,37 +266,41 @@ export default function ServiceDetailPage({ serviceId }: { serviceId: string }) 
 
             {/* Price */}
             <div className="border-t border-b border-gray-200 py-6 bg-gray-50/30">
-              <div className="flex items-baseline space-x-4">
-                <span className="text-4xl font-semibold text-primary">${service.price.toFixed(2)}</span>
-                {service.original_price && service.original_price > service.price && (
+              <div className="flex items-baseline flex-wrap gap-2">
+                <span className="text-4xl font-semibold text-primary">${pricePerHour.toFixed(2)}</span>
+                <span className="text-lg text-gray-600">per hour</span>
+                {service.original_price != null && service.original_price > pricePerHour && (
                   <>
-                    <span className="text-xl text-gray-400 line-through">${service.original_price.toFixed(2)}</span>
+                    <span className="text-xl text-gray-400 line-through">${Number(service.original_price).toFixed(2)}/hr</span>
                     <Badge className="bg-red-500 text-white">
-                      {Math.round((1 - service.price / service.original_price) * 100)}% OFF
+                      {Math.round((1 - pricePerHour / Number(service.original_price)) * 100)}% OFF
                     </Badge>
                   </>
                 )}
               </div>
+              <p className="text-sm text-gray-500 mt-2">
+                Total for {hours} {hours === 1 ? 'hour' : 'hours'}: <span className="font-semibold text-gray-900">${(pricePerHour * hours).toFixed(2)}</span>
+              </p>
             </div>
 
-            {/* Quantity Selector */}
+            {/* Hours Selector */}
             <div className="space-y-4">
               <div>
-                <label className="text-sm font-medium text-gray-600 mb-2 block">Quantity</label>
+                <label className="text-sm font-medium text-gray-600 mb-2 block">How many hours?</label>
                 <div className="flex items-center space-x-4">
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                    onClick={() => setHours(Math.max(1, hours - 1))}
                     className="border-gray-200 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-300"
                   >
                     -
                   </Button>
-                  <span className="text-lg font-medium text-gray-700 w-12 text-center">{quantity}</span>
+                  <span className="text-lg font-medium text-gray-700 w-12 text-center">{hours}</span>
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setQuantity(quantity + 1)}
+                    onClick={() => setHours(hours + 1)}
                     className="border-gray-200 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-300"
                   >
                     +
@@ -315,21 +359,9 @@ export default function ServiceDetailPage({ serviceId }: { serviceId: string }) 
                     <span className="font-medium text-gray-700">{service.category}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-500">Store</span>
-                    <span className="font-medium text-gray-700">{service.stores?.name || 'N/A'}</span>
+                    <span className="text-gray-500">Price</span>
+                    <span className="font-medium text-gray-700">${pricePerHour.toFixed(2)} per hour</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Vendor</span>
-                    <span className="font-medium text-gray-700">
-                      {service.stores?.vendors?.vendor_name || 'N/A'}
-                    </span>
-                  </div>
-                  {service.duration && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Duration</span>
-                      <span className="font-medium text-gray-700">{service.duration}</span>
-                    </div>
-                  )}
                   {service.location && (
                     <div className="flex justify-between">
                       <span className="text-gray-500">Location</span>
@@ -345,6 +377,9 @@ export default function ServiceDetailPage({ serviceId }: { serviceId: string }) 
                 </div>
               </CardContent>
             </Card>
+
+            {/* Reviews */}
+            <ServiceReviews serviceId={service.id} />
           </div>
         </div>
       </div>

@@ -8,7 +8,8 @@ import {
   ShoppingBag, 
   Settings,
   DollarSign,
-  AlertTriangle
+  AlertTriangle,
+  Wallet
 } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -289,6 +290,18 @@ export default function VendorDashboard() {
               <CardTitle className="text-gray-900">Orders</CardTitle>
               <CardDescription className="text-gray-600">
                 View and manage customer orders
+              </CardDescription>
+            </CardHeader>
+          </Card>
+
+          <Card className="border border-gray-200 bg-white hover:shadow-md transition-shadow cursor-pointer"
+            onClick={() => router.push("/vendor/payouts")}
+          >
+            <CardHeader>
+              <Wallet className="h-8 w-8 text-gray-600 mb-2" />
+              <CardTitle className="text-gray-900">Payouts</CardTitle>
+              <CardDescription className="text-gray-600">
+                View pending and received payouts
               </CardDescription>
             </CardHeader>
           </Card>

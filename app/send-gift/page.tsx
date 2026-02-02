@@ -17,6 +17,16 @@ function SendGiftContent() {
   const searchParams = useSearchParams()
   const [cartItems, setCartItems] = useState<CartItem[]>([])
   const [isModalOpen, setIsModalOpen] = useState(true)
+  const [taxPercent, setTaxPercent] = useState(8)
+
+  useEffect(() => {
+    fetch("/api/settings/checkout")
+      .then((res) => res.json())
+      .then((data) => {
+        if (typeof data.tax_percent === "number" && data.tax_percent >= 0) setTaxPercent(data.tax_percent)
+      })
+      .catch(() => {})
+  }, [])
 
   useEffect(() => {
     // Get items from query params
@@ -118,6 +128,7 @@ function SendGiftContent() {
         onConfirm={handleConfirmOrder}
         cartItems={cartItems}
         orderType="gift"
+        taxPercent={taxPercent}
       />
     </>
   )

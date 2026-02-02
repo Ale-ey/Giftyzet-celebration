@@ -1,17 +1,19 @@
-import { NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 import { stripe } from "@/lib/stripe/config"
 import { getServerUserAndRole } from "@/lib/supabase/server"
-import { supabase } from "@/lib/supabase/client"
+import { createServerSupabase } from "@/lib/supabase/server"
 
 const PAYOUT_DAYS_AFTER_DELIVERED = 7
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
     const token = req.headers.get("Authorization")?.replace("Bearer ", "").trim()
     const auth = await getServerUserAndRole(token)
     if (!auth || auth.role !== "admin") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
+
+    const supabase = createServerSupabase(token)
 
     const { data: settings } = await supabase
       .from("platform_settings")
@@ -21,22 +23,51 @@ export async function POST(req: Request) {
 
     const commissionPercent = Number(settings?.commission_percent ?? 10)
 
-    const cutoff = new Date()
-    cutoff.setDate(cutoff.getDate() - PAYOUT_DAYS_AFTER_DELIVERED)
+    let vendorOrders: Array<{ id: string; order_id: string; vendor_id: string; store_id: string; delivered_at: string | null }>
 
-    const { data: vendorOrders, error: voError } = await supabase
-      .from("vendor_orders")
-      .select("id, order_id, vendor_id, store_id, delivered_at")
-      .eq("status", "delivered")
-      .eq("payout_status", "pending")
-      .not("delivered_at", "is", null)
-      .lt("delivered_at", cutoff.toISOString())
+    try {
+      const body = await req.json().catch(() => ({}))
+      const vendorOrderIds = Array.isArray(body.vendor_order_ids)
+        ? body.vendor_order_ids.filter((id: unknown) => typeof id === "string")
+        : undefined
 
-    if (voError || !vendorOrders?.length) {
+      if (vendorOrderIds?.length) {
+        const { data, error } = await supabase
+          .from("vendor_orders")
+          .select("id, order_id, vendor_id, store_id, delivered_at")
+          .eq("status", "delivered")
+          .eq("payout_status", "pending")
+          .in("id", vendorOrderIds)
+
+        if (error) {
+          return NextResponse.json({ error: "Failed to load selected payouts" }, { status: 500 })
+        }
+        vendorOrders = data || []
+      } else {
+        const cutoff = new Date()
+        cutoff.setDate(cutoff.getDate() - PAYOUT_DAYS_AFTER_DELIVERED)
+        const { data, error } = await supabase
+          .from("vendor_orders")
+          .select("id, order_id, vendor_id, store_id, delivered_at")
+          .eq("status", "delivered")
+          .eq("payout_status", "pending")
+          .not("delivered_at", "is", null)
+          .lt("delivered_at", cutoff.toISOString())
+
+        if (error) {
+          return NextResponse.json({ error: "Failed to load payouts" }, { status: 500 })
+        }
+        vendorOrders = data || []
+      }
+    } catch {
+      vendorOrders = []
+    }
+
+    if (!vendorOrders.length) {
       return NextResponse.json({
         success: true,
         processed: 0,
-        message: vendorOrders?.length === 0 ? "No payouts due" : voError?.message,
+        message: "No payouts to process",
       })
     }
 
@@ -77,8 +108,9 @@ export async function POST(req: Request) {
         }
       }
 
-      const commissionAmount = Math.round((vendorTotal * commissionPercent / 100) * 100) / 100
+      const commissionAmount = Math.round((vendorTotal * commissionPercent) / 100 * 100) / 100
       const vendorAmount = Math.round((vendorTotal - commissionAmount) * 100) / 100
+      const orderTotal = Math.round(vendorTotal * 100) / 100
 
       const { data: storeRow } = await supabase
         .from("stores")
@@ -112,6 +144,16 @@ export async function POST(req: Request) {
             updated_at: new Date().toISOString(),
           })
           .eq("id", vo.id)
+        await supabase.from("vendor_payouts").insert({
+          vendor_order_id: vo.id,
+          order_id: vo.order_id,
+          vendor_id: vo.vendor_id,
+          store_id: vo.store_id,
+          order_total: orderTotal,
+          commission_amount: commissionAmount,
+          vendor_amount: vendorAmount,
+          paid_at: new Date().toISOString(),
+        })
         processed++
         continue
       }
@@ -135,6 +177,18 @@ export async function POST(req: Request) {
             updated_at: new Date().toISOString(),
           })
           .eq("id", vo.id)
+
+        await supabase.from("vendor_payouts").insert({
+          vendor_order_id: vo.id,
+          order_id: vo.order_id,
+          vendor_id: vo.vendor_id,
+          store_id: vo.store_id,
+          order_total: orderTotal,
+          commission_amount: commissionAmount,
+          vendor_amount: vendorAmount,
+          stripe_transfer_id: transfer.id,
+          paid_at: new Date().toISOString(),
+        })
 
         processed++
       } catch (stripeErr: unknown) {

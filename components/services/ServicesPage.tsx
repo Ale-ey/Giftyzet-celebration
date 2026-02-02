@@ -219,11 +219,11 @@ export default function ServicesPage() {
                         
                         <div className="flex items-center gap-1 mb-2">
                           <div className="flex">
-                            {[...Array(5)].map((_, i) => (
+                            {[1, 2, 3, 4, 5].map((star) => (
                               <Star
-                                key={i}
+                                key={star}
                                 className={`h-3 w-3 ${
-                                  i < Math.floor(service.rating || 0)
+                                  star <= Math.round(Number(service.rating) || 0)
                                     ? "fill-yellow-400 text-yellow-400"
                                     : "fill-gray-200 text-gray-200"
                                 }`}
@@ -231,30 +231,20 @@ export default function ServicesPage() {
                             ))}
                           </div>
                           <span className="text-xs text-gray-600">
-                            ({service.reviews_count || 0})
+                            {Number(service.rating ?? 0).toFixed(1)} ({(service.reviews_count ?? 0)} reviews)
                           </span>
                         </div>
 
-                        {(service.duration || service.location) && (
-                          <div className="space-y-1 mb-3">
-                            {service.duration && (
-                              <div className="flex items-center text-xs text-gray-600">
-                                <Clock className="h-3 w-3 mr-1" />
-                                {service.duration}
-                              </div>
-                            )}
-                            {service.location && (
-                              <div className="flex items-center text-xs text-gray-600">
-                                <MapPin className="h-3 w-3 mr-1" />
-                                {service.location}
-                              </div>
-                            )}
+                        {service.location && (
+                          <div className="flex items-center text-xs text-gray-600 mb-2">
+                            <MapPin className="h-3 w-3 mr-1" />
+                            {service.location}
                           </div>
                         )}
 
                         <div className="flex items-baseline gap-2 mb-3">
                           <span className="text-xl font-bold text-primary">
-                            ${service.price}
+                            ${typeof service.price === 'number' ? service.price.toFixed(2) : service.price}/hr
                           </span>
                           {service.original_price && service.price < service.original_price && (
                             <span className="text-sm text-gray-400 line-through">

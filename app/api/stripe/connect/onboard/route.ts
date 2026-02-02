@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { stripe } from "@/lib/stripe/config"
-import { getServerUserAndRole } from "@/lib/supabase/server"
-import { supabase } from "@/lib/supabase/client"
+import { createServerSupabase, getServerUserAndRole } from "@/lib/supabase/server"
 
 export async function POST(req: NextRequest) {
   try {
@@ -13,9 +12,12 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json()
     const storeId = body.storeId ?? body.store_id
+    const returnPath = body.returnPath ?? body.return_path ?? "/vendor/register-store"
     if (!storeId) {
       return NextResponse.json({ error: "storeId required" }, { status: 400 })
     }
+
+    const supabase = createServerSupabase(token)
 
     const { data: store, error: storeError } = await supabase
       .from("stores")
@@ -57,8 +59,9 @@ export async function POST(req: NextRequest) {
     }
 
     const origin = req.headers.get("origin") || process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"
-    const returnUrl = `${origin}/vendor/register-store?stripe=complete&store_id=${storeId}`
-    const refreshUrl = `${origin}/vendor/register-store?stripe=refresh&store_id=${storeId}`
+    const basePath = returnPath.startsWith("/") ? returnPath : `/${returnPath}`
+    const returnUrl = `${origin}${basePath}?stripe=complete&store_id=${storeId}`
+    const refreshUrl = `${origin}${basePath}?stripe=refresh&store_id=${storeId}`
 
     const accountLink = await stripe.accountLinks.create({
       account: accountId,

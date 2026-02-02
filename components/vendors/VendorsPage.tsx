@@ -47,7 +47,9 @@ export default function VendorsPage() {
           try {
             const products = await getProductsByStore(vendor.id)
             const services = await getServicesByStore(vendor.id)
-            productsMap[vendor.id] = [...products.slice(0, 3), ...services.slice(0, 3)].slice(0, 3)
+            const productsWithType = products.slice(0, 3).map((p: any) => ({ ...p, type: 'product' as const }))
+            const servicesWithType = services.slice(0, 3).map((s: any) => ({ ...s, type: 'service' as const }))
+            productsMap[vendor.id] = [...productsWithType, ...servicesWithType].slice(0, 6)
           } catch (err) {
             console.error(`Error fetching products for store ${vendor.id}:`, err)
             productsMap[vendor.id] = []
@@ -241,7 +243,7 @@ export default function VendorsPage() {
                             <div
                               key={product.id}
                               className="relative aspect-square rounded-lg overflow-hidden border border-gray-200 cursor-pointer hover:border-gray-300 transition-colors bg-gray-50"
-                              onClick={() => handleProductClick(product.id, product.duration ? 'service' : 'product')}
+                              onClick={() => handleProductClick(product.id, product.type || 'product')}
                             >
                               {product.image_url ? (
                                 <img

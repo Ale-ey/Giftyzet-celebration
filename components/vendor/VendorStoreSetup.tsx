@@ -1,22 +1,31 @@
 "use client"
 
 import { useEffect, useState, useRef } from "react"
-import { useRouter } from "next/navigation"
-import { Save, ArrowLeft, Upload, X } from "lucide-react"
+import { useRouter, useSearchParams } from "next/navigation"
+import { Save, ArrowLeft, Upload, X, CreditCard, CheckCircle2 } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { getStoreByVendorId, saveStore } from "@/lib/vendor-data"
+import { getCurrentUser } from "@/lib/api/auth"
+import { getVendorByUserId, getStoreByVendorId, updateStore } from "@/lib/api/vendors"
+import { uploadStoreLogo } from "@/lib/api/storage"
 import { STORE_CATEGORIES } from "@/lib/constants"
-import type { Store } from "@/types"
+import { useToast } from "@/components/ui/toast"
+import { supabase } from "@/lib/supabase/client"
 
 export default function VendorStoreSetup() {
   const router = useRouter()
-  const [store, setStore] = useState<Store | null>(null)
+  const searchParams = useSearchParams()
+  const { showToast } = useToast()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [storeId, setStoreId] = useState<string | null>(null)
   const [logoPreview, setLogoPreview] = useState<string>("")
+  const [logoFile, setLogoFile] = useState<File | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [stripeConnected, setStripeConnected] = useState(false)
+  const [stripeConnecting, setStripeConnecting] = useState(false)
+  const [initialLogoUrl, setInitialLogoUrl] = useState<string>("")
   const [formData, setFormData] = useState({
     name: "",
     description: "",
@@ -24,141 +33,313 @@ export default function VendorStoreSetup() {
     address: "",
     phone: "",
     email: "",
-    logo: ""
+    website: ""
   })
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [needsRegistration, setNeedsRegistration] = useState(false)
+  const [notSignedIn, setNotSignedIn] = useState(false)
 
+  // Load store from backend and fill form; also listen to auth so we run when session is ready
   useEffect(() => {
-    if (typeof window === "undefined") return
+    let cancelled = false
 
-    const { getVendors, saveVendor, saveStore } = require("@/lib/vendor-data")
-    const vendors = getVendors()
-    
-    // Use first vendor if exists, or create a demo vendor
-    let vendor = vendors[0]
-    
-    if (!vendor) {
-      const vendorId = `vendor-${Date.now()}`
-      vendor = {
-        id: vendorId,
-        email: "demo@vendor.com",
-        name: "Demo Vendor",
-        vendorName: "Demo Store",
-        role: "vendor" as const,
-        createdAt: new Date().toISOString()
+    async function loadStoreWithUser(user: { id: string }) {
+      if (cancelled) return
+      setLoadError(null)
+      setNeedsRegistration(false)
+      setNotSignedIn(false)
+      try {
+        const vendor = await getVendorByUserId(user.id)
+        if (!vendor || cancelled) {
+          setNeedsRegistration(true)
+          if (!cancelled) setLoading(false)
+          return
+        }
+        const store = await getStoreByVendorId(vendor.id)
+        if (!store || cancelled) {
+          setNeedsRegistration(true)
+          if (!cancelled) setLoading(false)
+          return
+        }
+        if (store.status === "suspended") {
+          router.push("/vendor")
+          return
+        }
+        setStoreId(store.id)
+        setStripeConnected(!!(store as any).stripe_onboarding_complete || !!(store as any).stripe_account_id)
+        setFormData({
+          name: store.name || "",
+          description: store.description || "",
+          category: store.category || "",
+          address: store.address || "",
+          phone: store.phone || "",
+          email: store.email || "",
+          website: store.website || ""
+        })
+        if (store.logo_url) {
+          setLogoPreview(store.logo_url)
+          setInitialLogoUrl(store.logo_url)
+        }
+      } catch (e) {
+        console.error("Load store error:", e)
+        setLoadError(e instanceof Error ? e.message : "Failed to load store")
+      } finally {
+        if (!cancelled) setLoading(false)
       }
-      saveVendor(vendor)
-      
-      // Create store with approved status for testing
-      const store: Store = {
-        id: `store-${Date.now()}`,
-        vendorId,
-        name: "Demo Store",
-        status: "approved" as const,
-        createdAt: new Date().toISOString()
-      }
-      saveStore(store)
     }
 
-    const vendorStore = getStoreByVendorId(vendor.id)
-    
-    // Check if store is suspended
-    if (vendorStore?.status === "suspended") {
-      router.push("/vendor")
+    async function tryLoadStore() {
+      setLoadError(null)
+      setNeedsRegistration(false)
+      setNotSignedIn(false)
+      try {
+        // Same auth source as VendorDashboard: getCurrentUser() with retries for session rehydration
+        let user = await getCurrentUser()
+        const delays = [300, 600]
+        for (const ms of delays) {
+          if (user || cancelled) break
+          await new Promise((r) => setTimeout(r, ms))
+          user = await getCurrentUser()
+        }
+        if (!user || cancelled) {
+          setNotSignedIn(true)
+          if (!cancelled) setLoading(false)
+          return
+        }
+        await loadStoreWithUser(user)
+      } catch (e) {
+        console.error("Load store error:", e)
+        setLoadError(e instanceof Error ? e.message : "Failed to load store")
+        if (!cancelled) setLoading(false)
+      }
+    }
+
+    tryLoadStore()
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (cancelled) return
+      if ((event === "INITIAL_SESSION" || event === "SIGNED_IN") && session?.user && !storeId) {
+        setNotSignedIn(false)
+        loadStoreWithUser(session.user)
+      }
+    })
+
+    return () => {
+      cancelled = true
+      subscription?.unsubscribe()
+    }
+  }, [router])
+
+  // Handle return from Stripe Connect onboarding (when started from this page)
+  useEffect(() => {
+    const stripeComplete = searchParams.get("stripe") === "complete"
+    const storeIdParam = searchParams.get("store_id")
+    if (!stripeComplete || !storeIdParam) return
+
+    const completeOnboarding = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session?.access_token) return
+        const res = await fetch(
+          `/api/stripe/connect/complete?store_id=${encodeURIComponent(storeIdParam)}`,
+          {
+            method: "POST",
+            headers: { Authorization: `Bearer ${session.access_token}` },
+          }
+        )
+        if (res.ok) {
+          setStripeConnected(true)
+          showToast("Stripe account connected. You can receive payouts after orders are delivered.", "success")
+          router.replace("/vendor/store", { scroll: false })
+        }
+      } catch (e) {
+        console.error("Stripe complete error:", e)
+      }
+    }
+    completeOnboarding()
+  }, [searchParams, router, showToast])
+
+  const handleConnectStripe = async () => {
+    if (!storeId) {
+      showToast("Save your store first, then connect Stripe.", "info")
       return
     }
-    
-    if (!vendorStore) {
-      // Create store if doesn't exist
-      const store: Store = {
-        id: `store-${Date.now()}`,
-        vendorId: vendor.id,
-        name: vendor.vendorName,
-        status: "approved" as const,
-        createdAt: new Date().toISOString()
+    setStripeConnecting(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.access_token) {
+        showToast("Please sign in to connect Stripe.", "error")
+        setStripeConnecting(false)
+        return
       }
-      saveStore(store)
-      setStore(store)
-      setFormData({
-        name: store.name || "",
-        description: store.description || "",
-        category: store.category || "",
-        address: store.address || "",
-        phone: store.phone || "",
-        email: store.email || "",
-        logo: store.logo || ""
+      const res = await fetch("/api/stripe/connect/onboard", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ storeId, returnPath: "/vendor/store" }),
       })
-      setLogoPreview(store.logo || "")
-    } else {
-      setStore(vendorStore)
-      setFormData({
-        name: vendorStore.name || "",
-        description: vendorStore.description || "",
-        category: vendorStore.category || "",
-        address: vendorStore.address || "",
-        phone: vendorStore.phone || "",
-        email: vendorStore.email || "",
-        logo: vendorStore.logo || ""
-      })
-      setLogoPreview(vendorStore.logo || "")
+      const data = await res.json()
+      if (!res.ok) {
+        showToast(data.error || "Failed to start Stripe setup.", "error")
+        setStripeConnecting(false)
+        return
+      }
+      if (data.url) {
+        window.location.href = data.url
+        return
+      }
+      setStripeConnecting(false)
+    } catch (e) {
+      console.error("Connect Stripe error:", e)
+      showToast("Something went wrong. Please try again.", "error")
+      setStripeConnecting(false)
     }
-    setLoading(false)
-  }, [router])
+  }
 
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
-
-    // Check file type
     if (!file.type.startsWith("image/")) {
-      alert("Please select an image file")
+      showToast("Please select an image file", "error")
       return
     }
-
-    // Check file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
-      alert("Image size should be less than 5MB")
+      showToast("Image should be less than 5MB", "error")
       return
     }
-
-    // Convert to base64
+    setLogoFile(file)
     const reader = new FileReader()
-    reader.onloadend = () => {
-      const base64String = reader.result as string
-      setFormData({ ...formData, logo: base64String })
-      setLogoPreview(base64String)
-    }
+    reader.onloadend = () => setLogoPreview(reader.result as string)
     reader.readAsDataURL(file)
   }
 
   const handleRemoveLogo = () => {
-    setFormData({ ...formData, logo: "" })
+    setLogoFile(null)
     setLogoPreview("")
-    if (fileInputRef.current) {
-      fileInputRef.current.value = ""
-    }
+    if (fileInputRef.current) fileInputRef.current.value = ""
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!store) return
+    if (!storeId) return
 
     setSaving(true)
-    const updatedStore: Store = {
-      ...store,
-      ...formData
-    }
-    saveStore(updatedStore)
-    
-    setTimeout(() => {
+    try {
+      const payload: Record<string, string> = {
+        name: formData.name.trim(),
+        description: formData.description?.trim() || "",
+        category: formData.category?.trim() || "",
+        address: formData.address?.trim() || "",
+        phone: formData.phone?.trim() || "",
+        email: formData.email?.trim() || "",
+        website: formData.website?.trim() || ""
+      }
+      if (logoFile && storeId) {
+        const logoUrl = await uploadStoreLogo(logoFile, storeId)
+        payload.logo_url = logoUrl
+      } else if (initialLogoUrl && !logoPreview) {
+        payload.logo_url = ""
+      }
+      await updateStore(storeId, payload)
+      showToast("Store details saved successfully.", "success")
+      if (logoFile) {
+        setLogoFile(null)
+        setInitialLogoUrl(payload.logo_url || "")
+      }
+      if (!logoPreview && payload.logo_url) setLogoPreview(payload.logo_url)
+    } catch (err: any) {
+      console.error("Save store error:", err)
+      showToast(err.message || "Failed to save. Please try again.", "error")
+    } finally {
       setSaving(false)
-      router.push("/vendor/dashboard")
-    }, 500)
+    }
   }
 
   if (loading) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="text-gray-600">Loading...</div>
+      </div>
+    )
+  }
+
+  if (notSignedIn) {
+    return (
+      <div className="min-h-screen bg-white">
+        <div className="container mx-auto px-4 py-8">
+          <Button
+            variant="ghost"
+            onClick={() => router.push("/vendor")}
+            className="mb-6 text-gray-900 hover:text-primary hover:bg-primary/10"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Dashboard
+          </Button>
+          <div className="max-w-5xl mx-auto">
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Store Setup</h1>
+            <p className="text-gray-600 mb-8">Configure your store details and information</p>
+            <Card className="border border-gray-200 bg-white">
+              <CardContent className="p-8 text-center">
+                <p className="text-gray-600 mb-6">
+                  Please sign in to access Store Setup. You need to be logged in as a vendor to edit your store.
+                </p>
+                <div className="flex flex-wrap gap-3 justify-center">
+                  <Button
+                    onClick={() => router.push("/auth/login")}
+                    className="bg-primary hover:bg-primary/90 text-white"
+                  >
+                    Sign in
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => router.push("/")}
+                    className="border-gray-200 text-gray-700 bg-white hover:bg-gray-50"
+                  >
+                    Back to home
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (needsRegistration || loadError) {
+    return (
+      <div className="min-h-screen bg-white">
+        <div className="container mx-auto px-4 py-8">
+          <Button
+            variant="ghost"
+            onClick={() => router.push("/vendor")}
+            className="mb-6 text-gray-900 hover:text-primary hover:bg-primary/10"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Dashboard
+          </Button>
+          <div className="max-w-5xl mx-auto">
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Store Setup</h1>
+            <p className="text-gray-600 mb-8">Configure your store details and information</p>
+            <Card className="border border-gray-200 bg-white">
+              <CardContent className="p-8 text-center">
+                <p className="text-gray-600 mb-6">
+                  {loadError
+                    ? loadError
+                    : "You need to complete your store registration first. Once your store is set up and approved, you can edit your details and connect Stripe here."}
+                </p>
+                <Button
+                  onClick={() => router.push("/vendor/register-store")}
+                  className="bg-primary hover:bg-primary/90 text-white"
+                >
+                  Go to Store Registration
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
       </div>
     )
   }
@@ -274,6 +455,20 @@ export default function VendorStoreSetup() {
                 </div>
 
                 <div className="space-y-2">
+                  <label htmlFor="website" className="text-sm font-semibold text-gray-900">
+                    Website
+                  </label>
+                  <Input
+                    id="website"
+                    type="url"
+                    value={formData.website}
+                    onChange={(e) => setFormData({ ...formData, website: e.target.value })}
+                    placeholder="https://www.example.com"
+                    className="bg-white border-gray-200 text-gray-900"
+                  />
+                </div>
+
+                <div className="space-y-2">
                   <label htmlFor="logo" className="text-sm font-semibold text-gray-900">
                     Store Logo
                   </label>
@@ -345,6 +540,40 @@ export default function VendorStoreSetup() {
               </form>
             </CardContent>
           </Card>
+
+          {/* Stripe payout account */}
+          {storeId && (
+            <Card className="border border-gray-200 bg-gray-50 mt-8">
+              <CardHeader>
+                <CardTitle className="text-gray-900 flex items-center gap-2 text-base">
+                  <CreditCard className="h-4 w-4" />
+                  Stripe payout account
+                </CardTitle>
+                <CardDescription className="text-gray-600">
+                  Connect your Stripe account to receive payouts. After an order is marked delivered, your share (after platform commission) is transferred to your Stripe account 7 days later.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {stripeConnected ? (
+                  <div className="flex items-center gap-2 text-green-700">
+                    <CheckCircle2 className="h-5 w-5" />
+                    <span className="font-medium">Stripe account connected</span>
+                  </div>
+                ) : (
+                  <Button
+                    type="button"
+                    onClick={handleConnectStripe}
+                    disabled={stripeConnecting}
+                    variant="outline"
+                    className="border-gray-300 bg-white text-gray-700"
+                  >
+                    <CreditCard className="h-4 w-4 mr-2" />
+                    {stripeConnecting ? "Redirecting..." : "Connect Stripe account"}
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
     </div>

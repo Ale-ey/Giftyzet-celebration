@@ -30,7 +30,6 @@ export default function AddServiceDialog({ isOpen, onClose, onSave, editService,
     price: "",
     original_price: "",
     category: "",
-    duration: "",
     location: "",
     available: true
   })
@@ -48,7 +47,6 @@ export default function AddServiceDialog({ isOpen, onClose, onSave, editService,
         price: editService.price?.toString() || "",
         original_price: editService.original_price?.toString() || "",
         category: editService.category || "",
-        duration: editService.duration || "",
         location: editService.location || "",
         available: editService.available !== false
       })
@@ -78,7 +76,6 @@ export default function AddServiceDialog({ isOpen, onClose, onSave, editService,
       price: "",
       original_price: "",
       category: "",
-      duration: "",
       location: "",
       available: true
     })
@@ -160,7 +157,6 @@ export default function AddServiceDialog({ isOpen, onClose, onSave, editService,
         price: parseFloat(formData.price),
         original_price: formData.original_price ? parseFloat(formData.original_price) : parseFloat(formData.price),
         category: formData.category,
-        duration: formData.duration,
         location: formData.location,
         available: formData.available
       }
@@ -236,7 +232,7 @@ export default function AddServiceDialog({ isOpen, onClose, onSave, editService,
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <label htmlFor="price" className="text-sm font-semibold text-gray-900">
-                Service Price *
+                Price per hour ($) *
               </label>
               <Input
                 id="price"
@@ -247,13 +243,13 @@ export default function AddServiceDialog({ isOpen, onClose, onSave, editService,
                 onChange={(e) => setFormData({ ...formData, price: e.target.value })}
                 required
                 className="bg-white border-gray-200 text-gray-900"
-                placeholder="99.99"
+                placeholder="e.g. 50.00"
               />
             </div>
 
             <div className="space-y-2">
               <label htmlFor="original_price" className="text-sm font-semibold text-gray-900">
-                Original Price
+                Original price per hour ($)
               </label>
               <Input
                 id="original_price"
@@ -263,37 +259,22 @@ export default function AddServiceDialog({ isOpen, onClose, onSave, editService,
                 value={formData.original_price}
                 onChange={(e) => setFormData({ ...formData, original_price: e.target.value })}
                 className="bg-white border-gray-200 text-gray-900"
-                placeholder="129.99"
+                placeholder="e.g. 65.00"
               />
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <label htmlFor="duration" className="text-sm font-semibold text-gray-900">
-                Duration
-              </label>
-              <Input
-                id="duration"
-                value={formData.duration}
-                onChange={(e) => setFormData({ ...formData, duration: e.target.value })}
-                className="bg-white border-gray-200 text-gray-900"
-                placeholder="e.g. 1 hour, 30 minutes"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label htmlFor="location" className="text-sm font-semibold text-gray-900">
-                Location
-              </label>
-              <Input
-                id="location"
-                value={formData.location}
-                onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                className="bg-white border-gray-200 text-gray-900"
-                placeholder="Service location"
-              />
-            </div>
+          <div className="space-y-2">
+            <label htmlFor="location" className="text-sm font-semibold text-gray-900">
+              Location
+            </label>
+            <Input
+              id="location"
+              value={formData.location}
+              onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+              className="bg-white border-gray-200 text-gray-900"
+              placeholder="Service location"
+            />
           </div>
 
           <div className="flex items-center space-x-2">

@@ -1,7 +1,7 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
+import { useEffect, useState, useCallback } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import {
   Store,
   CheckCircle2,
@@ -74,6 +74,8 @@ interface PayoutRow {
   commission_amount: number
   vendor_amount: number
   delivered_at: string
+  status: "pending" | "paid" | "failed"
+  paid_at?: string
 }
 
 export default function AdminDashboard() {
@@ -104,10 +106,13 @@ export default function AdminDashboard() {
   const [pluginQueriesError, setPluginQueriesError] = useState<string | null>(null)
 
   const [payouts, setPayouts] = useState<PayoutRow[]>([])
+  const [payoutsTotal, setPayoutsTotal] = useState(0)
   const [payoutsLoading, setPayoutsLoading] = useState(false)
   const [payoutsError, setPayoutsError] = useState<string | null>(null)
   const [selectedPayoutIds, setSelectedPayoutIds] = useState<Set<string>>(new Set())
   const [processPayoutsLoading, setProcessPayoutsLoading] = useState(false)
+  const [showProcessPayoutsConfirm, setShowProcessPayoutsConfirm] = useState(false)
+  const searchParams = useSearchParams()
   const [payoutMessage, setPayoutMessage] = useState<string | null>(null)
 
   const [giftingVideoUrl, setGiftingVideoUrl] = useState("")
@@ -210,6 +215,41 @@ export default function AdminDashboard() {
     fetchQueries()
   }, [isAuthorized, activeTab])
 
+  const payoutsPage = Math.max(1, parseInt(searchParams.get("payout_page") || "1", 10))
+  const payoutsSearch = searchParams.get("payout_search") || ""
+  const payoutsStoreName = searchParams.get("payout_store") || ""
+  const payoutsVendorName = searchParams.get("payout_vendor") || ""
+  const payoutsStatus = (searchParams.get("payout_status") || "all") as "all" | "pending" | "paid" | "failed"
+
+  const setPayoutsParams = useCallback(
+    (updates: { page?: number; search?: string; store_name?: string; vendor_name?: string; status?: string }) => {
+      const params = new URLSearchParams(searchParams.toString())
+      if (updates.page !== undefined) params.set("payout_page", String(updates.page))
+      if (updates.search !== undefined) {
+        if (updates.search) params.set("payout_search", updates.search)
+        else params.delete("payout_search")
+        params.set("payout_page", "1")
+      }
+      if (updates.store_name !== undefined) {
+        if (updates.store_name) params.set("payout_store", updates.store_name)
+        else params.delete("payout_store")
+        params.set("payout_page", "1")
+      }
+      if (updates.vendor_name !== undefined) {
+        if (updates.vendor_name) params.set("payout_vendor", updates.vendor_name)
+        else params.delete("payout_vendor")
+        params.set("payout_page", "1")
+      }
+      if (updates.status !== undefined) {
+        if (updates.status && updates.status !== "all") params.set("payout_status", updates.status)
+        else params.delete("payout_status")
+        params.set("payout_page", "1")
+      }
+      router.push(`/admin?${params.toString()}`, { scroll: false })
+    },
+    [router, searchParams]
+  )
+
   useEffect(() => {
     if (!isAuthorized || activeTab !== "payouts") return
     const fetchPayouts = async () => {
@@ -218,26 +258,36 @@ export default function AdminDashboard() {
       setPayoutMessage(null)
       try {
         const { data: { session } } = await supabase.auth.getSession()
-        const res = await fetch("/api/admin/payouts", {
+        const q = new URLSearchParams()
+        q.set("page", String(payoutsPage))
+        q.set("per_page", "10")
+        if (payoutsSearch) q.set("search", payoutsSearch)
+        if (payoutsStoreName) q.set("store_name", payoutsStoreName)
+        if (payoutsVendorName) q.set("vendor_name", payoutsVendorName)
+        if (payoutsStatus !== "all") q.set("status", payoutsStatus)
+        const res = await fetch(`/api/admin/payouts?${q.toString()}`, {
           headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {},
         })
         const data = await res.json()
         if (!res.ok) {
           setPayoutsError(data.error || "Failed to load payouts")
           setPayouts([])
+          setPayoutsTotal(0)
           return
         }
         setPayouts(data.payouts ?? [])
+        setPayoutsTotal(data.total ?? 0)
         setSelectedPayoutIds(new Set())
       } catch (e) {
         setPayoutsError("Failed to load payouts")
         setPayouts([])
+        setPayoutsTotal(0)
       } finally {
         setPayoutsLoading(false)
       }
     }
     fetchPayouts()
-  }, [isAuthorized, activeTab])
+  }, [isAuthorized, activeTab, payoutsPage, payoutsSearch, payoutsStoreName, payoutsVendorName, payoutsStatus])
 
   useEffect(() => {
     if (!isAuthorized || activeTab !== "pluginQueries") return
@@ -476,12 +526,15 @@ export default function AdminDashboard() {
     })
   }
 
+  const payablesPayouts = payouts.filter((p) => p.status === "pending" || p.status === "failed")
+
   const selectAllPayouts = () => {
-    if (selectedPayoutIds.size === payouts.length) setSelectedPayoutIds(new Set())
-    else setSelectedPayoutIds(new Set(payouts.map((p) => p.id)))
+    if (selectedPayoutIds.size === payablesPayouts.length) setSelectedPayoutIds(new Set())
+    else setSelectedPayoutIds(new Set(payablesPayouts.map((p) => p.id)))
   }
 
   const handleProcessPayouts = async () => {
+    setShowProcessPayoutsConfirm(false)
     const ids = Array.from(selectedPayoutIds)
     if (!ids.length) {
       setPayoutMessage("Select at least one payout to pay.")
@@ -508,9 +561,19 @@ export default function AdminDashboard() {
       )
       setSelectedPayoutIds(new Set())
       if (data.processed > 0) {
-        const res2 = await fetch("/api/admin/payouts", { headers })
+        const q = new URLSearchParams()
+        q.set("page", String(payoutsPage))
+        q.set("per_page", "10")
+        if (payoutsSearch) q.set("search", payoutsSearch)
+        if (payoutsStoreName) q.set("store_name", payoutsStoreName)
+        if (payoutsVendorName) q.set("vendor_name", payoutsVendorName)
+        if (payoutsStatus !== "all") q.set("status", payoutsStatus)
+        const res2 = await fetch(`/api/admin/payouts?${q.toString()}`, { headers })
         const data2 = await res2.json()
-        if (res2.ok && data2.payouts) setPayouts(data2.payouts)
+        if (res2.ok) {
+          setPayouts(data2.payouts ?? [])
+          setPayoutsTotal(data2.total ?? 0)
+        }
       }
     } catch (e) {
       console.error("Process payouts error:", e)
@@ -1011,12 +1074,40 @@ export default function AdminDashboard() {
                 Payouts
               </CardTitle>
               <CardDescription className="text-gray-600">
-                Delivered orders pending payout. Select rows and pay to transfer (after commission) to vendor Stripe accounts.
+                Delivered orders. Select pending rows and confirm to transfer (after commission) to vendor Stripe accounts.
               </CardDescription>
               <div className="flex flex-wrap items-center gap-3 pt-2">
+                <Input
+                  placeholder="Search by store or vendor name"
+                  value={payoutsSearch}
+                  onChange={(e) => setPayoutsParams({ search: e.target.value })}
+                  className="max-w-xs h-9"
+                />
+                <Input
+                  placeholder="Filter by store name"
+                  value={payoutsStoreName}
+                  onChange={(e) => setPayoutsParams({ store_name: e.target.value })}
+                  className="max-w-[180px] h-9"
+                />
+                <Input
+                  placeholder="Filter by vendor name"
+                  value={payoutsVendorName}
+                  onChange={(e) => setPayoutsParams({ vendor_name: e.target.value })}
+                  className="max-w-[180px] h-9"
+                />
+                <select
+                  value={payoutsStatus}
+                  onChange={(e) => setPayoutsParams({ status: e.target.value })}
+                  className="h-9 rounded-md border border-gray-200 px-3 text-sm text-gray-700 bg-white"
+                >
+                  <option value="all">Status: All</option>
+                  <option value="pending">Pending</option>
+                  <option value="paid">Paid</option>
+                  <option value="failed">Failed</option>
+                </select>
                 <Button
-                  onClick={handleProcessPayouts}
-                  disabled={processPayoutsLoading || payouts.length === 0 || selectedPayoutIds.size === 0}
+                  onClick={() => setShowProcessPayoutsConfirm(true)}
+                  disabled={processPayoutsLoading || payablesPayouts.length === 0 || selectedPayoutIds.size === 0}
                   className="bg-primary hover:bg-primary/90 text-white gap-2"
                 >
                   <DollarSign className="h-4 w-4" />
@@ -1035,67 +1126,137 @@ export default function AdminDashboard() {
               ) : payouts.length === 0 ? (
                 <div className="py-12 text-center text-gray-500 flex flex-col items-center gap-2">
                   <Wallet className="h-12 w-12 text-gray-300" />
-                  <p>No pending payouts. Delivered orders will appear here.</p>
+                  <p>No payouts match your filters.</p>
                 </div>
               ) : (
-                <div className="overflow-x-auto -mx-4 sm:mx-0">
-                  <table className="w-full border-collapse min-w-[800px]">
-                    <thead>
-                      <tr className="border-b border-gray-200">
-                        <th className="text-left py-3 px-4 w-10">
-                          <input
-                            type="checkbox"
-                            checked={selectedPayoutIds.size === payouts.length && payouts.length > 0}
-                            onChange={selectAllPayouts}
-                            className="rounded border-gray-300"
-                            aria-label="Select all"
-                          />
-                        </th>
-                        <th className="text-left py-3 px-4 text-sm font-semibold text-gray-900">Order #</th>
-                        <th className="text-left py-3 px-4 text-sm font-semibold text-gray-900">Store</th>
-                        <th className="text-left py-3 px-4 text-sm font-semibold text-gray-900">Vendor</th>
-                        <th className="text-left py-3 px-4 text-sm font-semibold text-gray-900">Order total</th>
-                        <th className="text-left py-3 px-4 text-sm font-semibold text-gray-900">Commission</th>
-                        <th className="text-left py-3 px-4 text-sm font-semibold text-gray-900">Vendor amount</th>
-                        <th className="text-left py-3 px-4 text-sm font-semibold text-gray-900">Delivered</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {payouts.map((row) => (
-                        <tr key={row.id} className="border-b border-gray-100 hover:bg-gray-50/50">
-                          <td className="py-3 px-4">
+                <>
+                  <div className="overflow-x-auto -mx-4 sm:mx-0">
+                    <table className="w-full border-collapse min-w-[800px]">
+                      <thead>
+                        <tr className="border-b border-gray-200">
+                          <th className="text-left py-3 px-4 w-10">
                             <input
                               type="checkbox"
-                              checked={selectedPayoutIds.has(row.id)}
-                              onChange={() => togglePayoutSelection(row.id)}
+                              checked={payablesPayouts.length > 0 && selectedPayoutIds.size === payablesPayouts.length}
+                              onChange={selectAllPayouts}
                               className="rounded border-gray-300"
-                              aria-label={`Select payout ${row.order_number}`}
+                              aria-label="Select all pending and failed"
                             />
-                          </td>
-                          <td className="py-3 px-4 text-sm font-medium text-gray-900">{row.order_number}</td>
-                          <td className="py-3 px-4 text-sm text-gray-600">{row.store_name}</td>
-                          <td className="py-3 px-4 text-sm text-gray-600">{row.vendor_name}</td>
-                          <td className="py-3 px-4 text-sm font-medium text-gray-900">
-                            ${row.order_total.toFixed(2)}
-                          </td>
-                          <td className="py-3 px-4 text-sm text-gray-600">
-                            ${row.commission_amount.toFixed(2)}
-                          </td>
-                          <td className="py-3 px-4 text-sm font-medium text-primary">
-                            ${row.vendor_amount.toFixed(2)}
-                          </td>
-                          <td className="py-3 px-4 text-sm text-gray-500 whitespace-nowrap">
-                            {formatPayoutDate(row.delivered_at)}
-                          </td>
+                          </th>
+                          <th className="text-left py-3 px-4 text-sm font-semibold text-gray-900">Order #</th>
+                          <th className="text-left py-3 px-4 text-sm font-semibold text-gray-900">Store</th>
+                          <th className="text-left py-3 px-4 text-sm font-semibold text-gray-900">Vendor</th>
+                          <th className="text-left py-3 px-4 text-sm font-semibold text-gray-900">Status</th>
+                          <th className="text-left py-3 px-4 text-sm font-semibold text-gray-900">Order total</th>
+                          <th className="text-left py-3 px-4 text-sm font-semibold text-gray-900">Commission</th>
+                          <th className="text-left py-3 px-4 text-sm font-semibold text-gray-900">Vendor amount</th>
+                          <th className="text-left py-3 px-4 text-sm font-semibold text-gray-900">Delivered</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody>
+                        {payouts.map((row) => (
+                          <tr key={row.id} className="border-b border-gray-100 hover:bg-gray-50/50">
+                            <td className="py-3 px-4">
+                              {row.status === "pending" || row.status === "failed" ? (
+                                <input
+                                  type="checkbox"
+                                  checked={selectedPayoutIds.has(row.id)}
+                                  onChange={() => togglePayoutSelection(row.id)}
+                                  className="rounded border-gray-300"
+                                  aria-label={`Select payout ${row.order_number}`}
+                                />
+                              ) : (
+                                <span className="text-gray-300">—</span>
+                              )}
+                            </td>
+                            <td className="py-3 px-4 text-sm font-medium text-gray-900">{row.order_number}</td>
+                            <td className="py-3 px-4 text-sm text-gray-600">{row.store_name}</td>
+                            <td className="py-3 px-4 text-sm text-gray-600">{row.vendor_name}</td>
+                            <td className="py-3 px-4">
+                              <Badge
+                                variant="outline"
+                                className={
+                                  row.status === "paid"
+                                    ? "border-green-200 bg-green-50 text-green-700"
+                                    : row.status === "failed"
+                                      ? "border-red-200 bg-red-50 text-red-700"
+                                      : "border-amber-200 bg-amber-50 text-amber-700"
+                                }
+                              >
+                                {row.status}
+                              </Badge>
+                            </td>
+                            <td className="py-3 px-4 text-sm font-medium text-gray-900">
+                              ${row.order_total.toFixed(2)}
+                            </td>
+                            <td className="py-3 px-4 text-sm text-gray-600">
+                              ${row.commission_amount.toFixed(2)}
+                            </td>
+                            <td className="py-3 px-4 text-sm font-medium text-primary">
+                              ${row.vendor_amount.toFixed(2)}
+                            </td>
+                            <td className="py-3 px-4 text-sm text-gray-500 whitespace-nowrap">
+                              {formatPayoutDate(row.delivered_at)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {payoutsTotal > 10 && (
+                    <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-200">
+                      <p className="text-sm text-gray-600">
+                        Showing {(payoutsPage - 1) * 10 + 1}–{Math.min(payoutsPage * 10, payoutsTotal)} of {payoutsTotal}
+                      </p>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={payoutsPage <= 1}
+                          onClick={() => setPayoutsParams({ page: payoutsPage - 1 })}
+                        >
+                          Previous
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={payoutsPage >= Math.ceil(payoutsTotal / 10)}
+                          onClick={() => setPayoutsParams({ page: payoutsPage + 1 })}
+                        >
+                          Next
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </CardContent>
           </Card>
         )}
+
+        {/* Confirm process payouts modal */}
+        <Dialog open={showProcessPayoutsConfirm} onOpenChange={setShowProcessPayoutsConfirm}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Confirm payout</DialogTitle>
+              <DialogDescription>
+                You are about to process {selectedPayoutIds.size} payout(s). This will transfer funds (after commission) to the vendors&apos; Stripe accounts. Continue?
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                className="bg-white border-gray-200 text-gray-700 hover:bg-gray-50"
+                onClick={() => setShowProcessPayoutsConfirm(false)}
+              >
+                Cancel
+              </Button>
+              <Button onClick={handleProcessPayouts} className="bg-primary hover:bg-primary/90 text-white">
+                Confirm
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   )

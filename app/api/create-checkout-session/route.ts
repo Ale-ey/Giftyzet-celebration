@@ -15,6 +15,15 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    const orderIdStr = typeof orderId === 'string' ? orderId.trim() : ''
+    const isValidOrderId = orderIdStr.length === 36 && /^[0-9a-f-]{36}$/i.test(orderIdStr)
+    if (!isValidOrderId) {
+      return NextResponse.json(
+        { error: 'Invalid order' },
+        { status: 400 }
+      )
+    }
+
     // Create line items for Stripe
     const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = items.map((item: any) => {
       const price = typeof item.price === 'string' 
@@ -77,11 +86,11 @@ export async function POST(req: NextRequest) {
       payment_method_types: ['card'],
       line_items: lineItems,
       mode: 'payment',
-      success_url: `${origin}/order-success?session_id={CHECKOUT_SESSION_ID}&orderId=${orderId}`,
+      success_url: `${origin}/order-success?session_id={CHECKOUT_SESSION_ID}&orderId=${orderIdStr}`,
       cancel_url: `${origin}/checkout?cancelled=true`,
       customer_email: orderData?.senderEmail || undefined,
       metadata: {
-        orderId: orderId || '',
+        orderId: orderIdStr,
         orderType: orderData?.orderType || 'self',
         senderName: orderData?.senderName || '',
         senderEmail: orderData?.senderEmail || '',

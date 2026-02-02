@@ -3,8 +3,6 @@ import { stripe } from "@/lib/stripe/config"
 import { getServerUserAndRole } from "@/lib/supabase/server"
 import { createServerSupabase } from "@/lib/supabase/server"
 
-const PAYOUT_DAYS_AFTER_DELIVERED = 7
-
 export async function POST(req: NextRequest) {
   try {
     const token = req.headers.get("Authorization")?.replace("Bearer ", "").trim()
@@ -36,7 +34,7 @@ export async function POST(req: NextRequest) {
           .from("vendor_orders")
           .select("id, order_id, vendor_id, store_id, delivered_at")
           .eq("status", "delivered")
-          .eq("payout_status", "pending")
+          .in("payout_status", ["pending", "failed"])
           .in("id", vendorOrderIds)
 
         if (error) {
@@ -44,15 +42,14 @@ export async function POST(req: NextRequest) {
         }
         vendorOrders = data || []
       } else {
-        const cutoff = new Date()
-        cutoff.setDate(cutoff.getDate() - PAYOUT_DAYS_AFTER_DELIVERED)
+        // No selection: get all delivered + pending or failed (admin can retry failed payouts)
         const { data, error } = await supabase
           .from("vendor_orders")
           .select("id, order_id, vendor_id, store_id, delivered_at")
           .eq("status", "delivered")
-          .eq("payout_status", "pending")
+          .in("payout_status", ["pending", "failed"])
           .not("delivered_at", "is", null)
-          .lt("delivered_at", cutoff.toISOString())
+          .order("delivered_at", { ascending: true })
 
         if (error) {
           return NextResponse.json({ error: "Failed to load payouts" }, { status: 500 })
@@ -158,13 +155,42 @@ export async function POST(req: NextRequest) {
         continue
       }
 
+      // Check that the connected account has the transfers capability active (vendor must complete Connect onboarding)
+      let transfersCapable = false
       try {
-        const transfer = await stripe.transfers.create({
-          amount: amountCents,
-          currency: "usd",
-          destination: storeRow.stripe_account_id,
-          description: `Payout for order ${orderId}`,
-        })
+        const account = await stripe.accounts.retrieve(storeRow.stripe_account_id)
+        transfersCapable = account.capabilities?.transfers === "active"
+      } catch {
+        // If we can't retrieve the account, we'll try the transfer and let Stripe return the error
+      }
+
+      if (!transfersCapable) {
+        await supabase
+          .from("vendor_orders")
+          .update({
+            payout_status: "failed",
+            commission_amount: commissionAmount,
+            vendor_amount: vendorAmount,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", vo.id)
+        errors.push(
+          `Order ${vo.order_id}: Vendor's Stripe account is not ready for payouts. The vendor must complete Stripe Connect onboarding (add bank account) in Store Setup → Connect Stripe account, then finish the full flow on Stripe.`
+        )
+        continue
+      }
+
+      try {
+        // Idempotency key prevents duplicate transfers if admin retries or request is duplicated
+        const transfer = await stripe.transfers.create(
+          {
+            amount: amountCents,
+            currency: "usd",
+            destination: storeRow.stripe_account_id,
+            description: `Payout for order ${orderId}`,
+          },
+          { idempotencyKey: `payout_vendor_order_${vo.id}` }
+        )
 
         await supabase
           .from("vendor_orders")
@@ -193,7 +219,13 @@ export async function POST(req: NextRequest) {
         processed++
       } catch (stripeErr: unknown) {
         const msg = stripeErr instanceof Error ? stripeErr.message : String(stripeErr)
-        errors.push(`Vendor order ${vo.id}: ${msg}`)
+        const isTransfersCapabilityError =
+          /destination account needs to have at least one of the following capabilities enabled/i.test(msg) ||
+          /transfers.*capability/i.test(msg)
+        const userMessage = isTransfersCapabilityError
+          ? `Order ${vo.order_id}: Vendor's Stripe account is not ready for payouts. The vendor must complete Stripe Connect onboarding (add bank account) in Store Setup → Connect Stripe account.`
+          : `Vendor order ${vo.id}: ${msg}`
+        errors.push(userMessage)
         await supabase
           .from("vendor_orders")
           .update({

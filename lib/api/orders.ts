@@ -29,76 +29,63 @@ export interface CreateOrderData {
   total: number
 }
 
-// Create order
+// Create order (order + order_items in one transaction via RPC; trigger decreases product stock)
 export async function createOrder(orderData: CreateOrderData) {
-  // Generate gift token if gift order
-  const giftToken = orderData.order_type === 'gift' 
+  const giftToken = orderData.order_type === 'gift'
     ? `gift-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
     : null
 
-  const giftLink = giftToken 
+  const giftLink = giftToken
     ? `${typeof window !== 'undefined' ? window.location.origin : ''}/gift-receiver/${giftToken}`
     : null
 
-  // Create order
-  const { data: order, error: orderError } = await supabase
-    .from('orders')
-    .insert({
-      order_number: `ORD-${Date.now()}`,
-      user_id: orderData.user_id || null,
-      order_type: orderData.order_type,
-      sender_name: orderData.sender_name,
-      sender_email: orderData.sender_email,
-      sender_phone: orderData.sender_phone,
-      sender_address: orderData.sender_address,
-      receiver_name: orderData.receiver_name,
-      receiver_email: orderData.receiver_email,
-      receiver_phone: orderData.receiver_phone,
-      receiver_address: orderData.receiver_address,
-      shipping_address: orderData.shipping_address,
-      subtotal: orderData.subtotal,
-      shipping: orderData.shipping,
-      tax: orderData.tax,
-      total: orderData.total,
-      gift_token: giftToken,
-      gift_link: giftLink,
-      status: orderData.order_type === 'gift' ? 'pending' : 'confirmed',
-    })
-    .select()
-    .single()
+  const orderPayload = {
+    order_number: `ORD-${Date.now()}`,
+    user_id: orderData.user_id || null,
+    order_type: orderData.order_type,
+    sender_name: orderData.sender_name,
+    sender_email: orderData.sender_email,
+    sender_phone: orderData.sender_phone,
+    sender_address: orderData.sender_address,
+    receiver_name: orderData.receiver_name ?? '',
+    receiver_email: orderData.receiver_email ?? '',
+    receiver_phone: orderData.receiver_phone ?? '',
+    receiver_address: orderData.receiver_address ?? '',
+    shipping_address: orderData.shipping_address ?? '',
+    subtotal: orderData.subtotal,
+    shipping: orderData.shipping,
+    tax: orderData.tax,
+    total: orderData.total,
+    gift_token: giftToken ?? '',
+    gift_link: giftLink ?? '',
+    status: orderData.order_type === 'gift' ? 'pending' : 'confirmed',
+  }
 
-  if (orderError) throw orderError
-
-  // Create order items
-  const orderItems = orderData.items.map(item => ({
-    order_id: order.id,
-    ...item,
+  const itemsPayload = orderData.items.map((item) => ({
+    item_type: item.item_type,
+    product_id: item.product_id ?? '',
+    service_id: item.service_id ?? '',
+    name: item.name,
+    price: item.price,
+    quantity: item.quantity || 1,
+    image_url: item.image_url ?? '',
   }))
 
-  const { error: itemsError } = await supabase
-    .from('order_items')
-    .insert(orderItems)
+  const { data: orderJson, error: rpcError } = await supabase.rpc('create_order', {
+    order_data: orderPayload,
+    items_data: itemsPayload,
+  })
 
-  if (itemsError) throw itemsError
-
-  // Reduce product stock for each product item in the order
-  for (const item of orderData.items) {
-    if (item.product_id && item.quantity) {
-      const { data: product, error: fetchErr } = await supabase
-        .from('products')
-        .select('stock')
-        .eq('id', item.product_id)
-        .single()
-      if (!fetchErr && product != null) {
-        const currentStock = typeof product.stock === 'number' ? product.stock : parseInt(String(product.stock), 10) || 0
-        const newStock = Math.max(0, currentStock - item.quantity)
-        await supabase
-          .from('products')
-          .update({ stock: newStock })
-          .eq('id', item.product_id)
-      }
+  if (rpcError) {
+    const msg = rpcError.message || 'Failed to create order'
+    if (msg.includes('Insufficient stock') || msg.includes('stock')) {
+      throw new Error('Insufficient stock for one or more products. Please update your cart and try again.')
     }
+    throw new Error(msg)
   }
+
+  const order = orderJson as any
+  if (!order?.id) throw new Error('Order was not created')
 
   // Create vendor orders (group by vendor/store)
   const vendorOrderMap = new Map<string, { vendorId: string; storeId: string }>()

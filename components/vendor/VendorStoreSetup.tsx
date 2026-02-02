@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { Save, ArrowLeft, Upload, X, CreditCard, CheckCircle2 } from "lucide-react"
+import { Save, ArrowLeft, Upload, X, CreditCard, CheckCircle2, ExternalLink } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -25,6 +25,8 @@ export default function VendorStoreSetup() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [stripeConnected, setStripeConnected] = useState(false)
   const [stripeConnecting, setStripeConnecting] = useState(false)
+  const [stripeDisconnecting, setStripeDisconnecting] = useState(false)
+  const [stripeDashboardOpening, setStripeDashboardOpening] = useState(false)
   const [initialLogoUrl, setInitialLogoUrl] = useState<string>("")
   const [formData, setFormData] = useState({
     name: "",
@@ -195,6 +197,77 @@ export default function VendorStoreSetup() {
       console.error("Connect Stripe error:", e)
       showToast("Something went wrong. Please try again.", "error")
       setStripeConnecting(false)
+    }
+  }
+
+  const handleDisconnectStripe = async () => {
+    if (!storeId) return
+    if (!window.confirm("Disconnect your Stripe account? You can connect again or use a different account later.")) return
+    setStripeDisconnecting(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.access_token) {
+        showToast("Please sign in to disconnect Stripe.", "error")
+        setStripeDisconnecting(false)
+        return
+      }
+      const res = await fetch("/api/stripe/connect/disconnect", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ storeId }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        showToast(data.error || "Failed to disconnect Stripe.", "error")
+        setStripeDisconnecting(false)
+        return
+      }
+      setStripeConnected(false)
+      showToast("Stripe account disconnected. You can connect again or a different account.", "success")
+    } catch (e) {
+      console.error("Disconnect Stripe error:", e)
+      showToast("Something went wrong. Please try again.", "error")
+    } finally {
+      setStripeDisconnecting(false)
+    }
+  }
+
+  const handleOpenStripeDashboard = async () => {
+    if (!storeId) return
+    setStripeDashboardOpening(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.access_token) {
+        showToast("Please sign in to open Stripe dashboard.", "error")
+        setStripeDashboardOpening(false)
+        return
+      }
+      const res = await fetch("/api/stripe/connect/dashboard-link", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ storeId }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        showToast(data.error || "Failed to open Stripe dashboard.", "error")
+        setStripeDashboardOpening(false)
+        return
+      }
+      if (data.url) {
+        window.open(data.url, "_blank", "noopener,noreferrer")
+        showToast("Opened Stripe dashboard. Check your balance and payouts there.", "info")
+      }
+    } catch (e) {
+      console.error("Open Stripe dashboard error:", e)
+      showToast("Something went wrong. Please try again.", "error")
+    } finally {
+      setStripeDashboardOpening(false)
     }
   }
 
@@ -550,14 +623,50 @@ export default function VendorStoreSetup() {
                   Stripe payout account
                 </CardTitle>
                 <CardDescription className="text-gray-600">
-                  Connect your Stripe account to receive payouts. After an order is marked delivered, your share (after platform commission) is transferred to your Stripe account 7 days later.
+                  Connect your Stripe account to receive payouts. After an order is marked delivered, your share (after platform commission) is transferred when the admin processes payouts.
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 {stripeConnected ? (
-                  <div className="flex items-center gap-2 text-green-700">
-                    <CheckCircle2 className="h-5 w-5" />
-                    <span className="font-medium">Stripe account connected</span>
+                  <div className="flex flex-col gap-3">
+                    <div className="flex items-center gap-2 text-green-700">
+                      <CheckCircle2 className="h-5 w-5" />
+                      <span className="font-medium">Stripe account connected</span>
+                    </div>
+                    <p className="text-sm text-gray-600">
+                      Open your Stripe Express dashboard to see your balance, payouts, and test transfers.
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        onClick={handleOpenStripeDashboard}
+                        disabled={stripeDashboardOpening}
+                        variant="outline"
+                        className="border-primary/50 bg-white text-primary hover:bg-primary/5"
+                      >
+                        <ExternalLink className="h-4 w-4 mr-2" />
+                        {stripeDashboardOpening ? "Opening..." : "Open Stripe dashboard"}
+                      </Button>
+                      <Button
+                        type="button"
+                        onClick={handleConnectStripe}
+                        disabled={stripeConnecting}
+                        variant="outline"
+                        className="border-gray-300 bg-white text-gray-700"
+                      >
+                        <CreditCard className="h-4 w-4 mr-2" />
+                        {stripeConnecting ? "Redirecting..." : "Reconnect / Update Stripe"}
+                      </Button>
+                      <Button
+                        type="button"
+                        onClick={handleDisconnectStripe}
+                        disabled={stripeDisconnecting}
+                        variant="outline"
+                        className="border-gray-300 bg-white text-gray-600 hover:bg-gray-100"
+                      >
+                        {stripeDisconnecting ? "Disconnecting..." : "Disconnect Stripe account"}
+                      </Button>
+                    </div>
                   </div>
                 ) : (
                   <Button

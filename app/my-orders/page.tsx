@@ -80,9 +80,9 @@ export default function MyOrdersPage() {
       <div className="min-h-screen bg-gray-50">
         <div className="container mx-auto px-4 py-16">
           <h1 className="text-3xl font-bold text-gray-900 mb-8">My Orders</h1>
-          <Card className="max-w-2xl mx-auto">
-            <CardContent className="p-12 text-center">
-              <ShoppingBag className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+          <Card className="max-w-2xl mx-auto bg-white border-gray-200 shadow-sm">
+            <CardContent className="p-12 text-center bg-white">
+              <ShoppingBag className="h-16 w-16 text-gray-400 mx-auto mb-4" />
               <h2 className="text-2xl font-semibold text-gray-900 mb-2">No Orders Yet</h2>
               <p className="text-gray-600 mb-6">
                 You haven't placed any orders yet. Start shopping to see your orders here.
@@ -127,7 +127,14 @@ export default function MyOrdersPage() {
                     <Badge className={`${getStatusColor(order.status)} text-white capitalize`}>
                       {order.status}
                     </Badge>
-                    <Badge variant="outline" className="capitalize">
+                    <Badge
+                      variant="outline"
+                      className={
+                        order.order_type === "self"
+                          ? "bg-gray-800 text-white border-gray-800 capitalize"
+                          : "capitalize"
+                      }
+                    >
                       {order.order_type}
                     </Badge>
                   </div>
@@ -136,28 +143,34 @@ export default function MyOrdersPage() {
                 {/* Order Items Preview */}
                 <div className="border-t border-gray-200 pt-4 mb-4">
                   <div className="space-y-3">
-                    {order.order_items?.slice(0, 2).map((item: any, idx: number) => (
-                      <div key={idx} className="flex items-center gap-3">
-                        <div className="relative w-12 h-12 rounded border border-gray-200 flex-shrink-0 bg-gray-50">
-                          {item.image_url ? (
-                            <img
-                              src={item.image_url}
-                              alt={item.name}
-                              className="w-full h-full object-cover rounded"
-                            />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center">
-                              <Package className="h-6 w-6 text-gray-300" />
-                            </div>
-                          )}
+                    {order.order_items?.slice(0, 2).map((item: any, idx: number) => {
+                      const qty = item.quantity ?? 1
+                      const unitPrice = parseFloat(item.price) || 0
+                      const lineTotal = unitPrice * qty
+                      const isService = item.item_type === "service"
+                      return (
+                        <div key={idx} className="flex items-center gap-3">
+                          <div className="relative w-12 h-12 rounded border border-gray-200 shrink-0 bg-gray-50">
+                            {item.image_url ? (
+                              <img
+                                src={item.image_url}
+                                alt={item.name}
+                                className="w-full h-full object-cover rounded"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center">
+                                <Package className="h-6 w-6 text-gray-300" />
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-900 truncate">{item.name}</p>
+                            <p className="text-xs text-gray-600">{isService ? `${qty} hr(s)` : `Qty: ${qty}`}</p>
+                          </div>
+                          <p className="text-sm font-semibold text-gray-900">${lineTotal.toFixed(2)}</p>
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-900 truncate">{item.name}</p>
-                          <p className="text-xs text-gray-600">Qty: {item.quantity}</p>
-                        </div>
-                        <p className="text-sm font-semibold text-gray-900">${parseFloat(item.price).toFixed(2)}</p>
-                      </div>
-                    ))}
+                      )
+                    })}
                     {order.order_items && order.order_items.length > 2 && (
                       <p className="text-sm text-gray-600">
                         +{order.order_items.length - 2} more item{order.order_items.length - 2 > 1 ? 's' : ''}

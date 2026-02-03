@@ -16,7 +16,6 @@ export interface ServiceData {
   price: number
   original_price?: number
   category: string
-  duration?: string
   location?: string
   available?: boolean
 }
@@ -194,7 +193,36 @@ export async function getProductsByStore(storeId: string) {
   return data
 }
 
-// Get single product
+// Get rating and reviews_count from reviews table (source of truth for display)
+async function getProductRatingFromReviews(productId: string): Promise<{ rating: number; reviews_count: number }> {
+  const { data, error } = await supabase
+    .from('reviews')
+    .select('rating')
+    .eq('product_id', productId)
+
+  if (error) return { rating: 0, reviews_count: 0 }
+  const list = data || []
+  if (list.length === 0) return { rating: 0, reviews_count: 0 }
+  const sum = list.reduce((s, r) => s + Number(r.rating), 0)
+  const rating = Math.round((sum / list.length) * 10) / 10
+  return { rating, reviews_count: list.length }
+}
+
+async function getServiceRatingFromReviews(serviceId: string): Promise<{ rating: number; reviews_count: number }> {
+  const { data, error } = await supabase
+    .from('reviews')
+    .select('rating')
+    .eq('service_id', serviceId)
+
+  if (error) return { rating: 0, reviews_count: 0 }
+  const list = data || []
+  if (list.length === 0) return { rating: 0, reviews_count: 0 }
+  const sum = list.reduce((s, r) => s + Number(r.rating), 0)
+  const rating = Math.round((sum / list.length) * 10) / 10
+  return { rating, reviews_count: list.length }
+}
+
+// Get single product (rating and reviews_count computed from reviews table)
 export async function getProduct(productId: string) {
   const { data, error } = await supabase
     .from('products')
@@ -212,7 +240,12 @@ export async function getProduct(productId: string) {
     .single()
 
   if (error) throw error
-  return data
+  const fromReviews = await getProductRatingFromReviews(productId)
+  return {
+    ...data,
+    rating: fromReviews.rating,
+    reviews_count: fromReviews.reviews_count,
+  }
 }
 
 // Get all approved products (for marketplace)
@@ -344,7 +377,7 @@ export async function getServicesByStore(storeId: string) {
   return data
 }
 
-// Get single service
+// Get single service (rating and reviews_count computed from reviews table)
 export async function getService(serviceId: string) {
   const { data, error } = await supabase
     .from('services')
@@ -362,7 +395,12 @@ export async function getService(serviceId: string) {
     .single()
 
   if (error) throw error
-  return data
+  const fromReviews = await getServiceRatingFromReviews(serviceId)
+  return {
+    ...data,
+    rating: fromReviews.rating,
+    reviews_count: fromReviews.reviews_count,
+  }
 }
 
 // Get all approved services (for marketplace)

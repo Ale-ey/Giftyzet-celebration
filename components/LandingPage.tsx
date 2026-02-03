@@ -42,6 +42,13 @@ import {
 import Image from "next/image";
 import { getTopVendorsByRating } from "@/lib/api/vendors";
 import AuthModal from "@/components/AuthModal";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface Category {
   id: string;
@@ -58,6 +65,7 @@ interface Product {
   image_url: string;
   category: string;
   trending_rank?: number;
+  reviews_count?: number;
 }
 
 interface Service {
@@ -68,8 +76,8 @@ interface Service {
   price_per_hour: number;
   image_url: string;
   location?: string;
-  duration_hours?: number;
   rating?: number;
+  reviews_count?: number;
 }
 
 interface Vendor {
@@ -142,6 +150,27 @@ export default function LandingPage() {
   const statsRef = useRef<HTMLDivElement>(null);
   const [statsAnimated, setStatsAnimated] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isPluginQueryModalOpen, setIsPluginQueryModalOpen] = useState(false);
+  const [pluginQuerySubmitting, setPluginQuerySubmitting] = useState(false);
+  const [pluginQuerySuccess, setPluginQuerySuccess] = useState(false);
+  const [pluginQueryForm, setPluginQueryForm] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    query: "",
+  });
+  const [platformServicePercent, setPlatformServicePercent] = useState<number>(8);
+  const [pluginServicePercent, setPluginServicePercent] = useState<number>(0);
+
+  useEffect(() => {
+    fetch("/api/settings/checkout")
+      .then((res) => res.json())
+      .then((data) => {
+        if (typeof data.tax_percent === "number" && data.tax_percent >= 0) setPlatformServicePercent(data.tax_percent);
+        if (typeof data.plugin_tax === "number" && data.plugin_tax >= 0) setPluginServicePercent(data.plugin_tax);
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     fetchLandingPageData();
@@ -504,9 +533,20 @@ export default function LandingPage() {
                         {product.name}
                       </h3>
                       <div className="flex items-center gap-1 mb-2">
-                        <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                        <div className="flex">
+                          {[1, 2, 3, 4, 5].map((star) => (
+                            <Star
+                              key={star}
+                              className={`h-4 w-4 ${
+                                star <= Math.round(Number(product.rating) || 0)
+                                  ? "fill-yellow-400 text-yellow-400"
+                                  : "fill-gray-200 text-gray-200"
+                              }`}
+                            />
+                          ))}
+                        </div>
                         <span className="text-sm text-gray-600">
-                          {product.rating || 0}
+                          {Number(product.rating ?? 0).toFixed(1)} ({(product.reviews_count ?? 0)} reviews)
                         </span>
                       </div>
                       <div className="text-lg font-bold text-gray-900 mb-3">
@@ -623,13 +663,27 @@ export default function LandingPage() {
                         {/* Content Section */}
                         <div className="p-4 bg-white rounded-b-lg">
                           {/* Title and Rating */}
-                          <div className="flex items-start justify-between mb-2">
-                            <h3 className="font-bold text-gray-800 text-base flex-1">
+                          <div className="mb-2">
+                            <h3 className="font-bold text-gray-800 text-base mb-1">
                               {service.name}
                             </h3>
-                            <span className="text-sm text-gray-500 ml-2">
-                              {service.rating || 0}
-                            </span>
+                            <div className="flex items-center gap-1">
+                              <div className="flex">
+                                {[1, 2, 3, 4, 5].map((star) => (
+                                  <Star
+                                    key={star}
+                                    className={`h-3.5 w-3.5 ${
+                                      star <= Math.round(Number(service.rating) || 0)
+                                        ? "fill-yellow-400 text-yellow-400"
+                                        : "fill-gray-200 text-gray-200"
+                                    }`}
+                                  />
+                                ))}
+                              </div>
+                              <span className="text-sm text-gray-500">
+                                {Number(service.rating ?? 0).toFixed(1)} ({(service.reviews_count ?? 0)} reviews)
+                              </span>
+                            </div>
                           </div>
 
                           {/* Description */}
@@ -637,17 +691,13 @@ export default function LandingPage() {
                             {service.description}
                           </p>
 
-                          {/* Location and Duration */}
-                          <div className="flex items-center gap-4 text-sm text-gray-500 mb-3">
-                            <div className="flex items-center gap-1">
+                          {/* Location */}
+                          {service.location && (
+                            <div className="flex items-center gap-1 text-sm text-gray-500 mb-3">
                               <MapPin className="h-3 w-3" />
-                              <span>{service.location || "Downtown Area"}</span>
+                              <span>{service.location}</span>
                             </div>
-                            <div className="flex items-center gap-1">
-                              <Clock className="h-3 w-3" />
-                              <span>{service.duration_hours || 3}h</span>
-                            </div>
-                          </div>
+                          )}
 
                           {/* Price and Buttons */}
                           <div className="flex items-center justify-between">
@@ -977,7 +1027,7 @@ export default function LandingPage() {
                     {/* Features */}
                     <div className="flex flex-wrap gap-2 mb-6">
                       <span className="bg-gray-100 text-gray-700 text-xs font-medium px-3 py-1 rounded-full">
-                        7.5% commission
+                        Platform service: {platformServicePercent}%
                       </span>
                       <span className="bg-gray-100 text-gray-700 text-xs font-medium px-3 py-1 rounded-full">
                         No monthly fees
@@ -1015,16 +1065,16 @@ export default function LandingPage() {
                     {/* Features */}
                     <div className="flex flex-wrap gap-2 mb-6">
                       <span className="bg-gray-100 text-gray-700 text-xs font-medium px-3 py-1 rounded-full">
-                        3.5% transaction fee
+                        Plugin service: {pluginServicePercent}%
                       </span>
                       <span className="bg-gray-100 text-gray-700 text-xs font-medium px-3 py-1 rounded-full">
                         10-min setup
                       </span>
                     </div>
 
-                    {/* Button */}
+                    {/* Button - opens plugin query modal */}
                     <Button
-                      onClick={() => router.push("/marketplace")}
+                      onClick={() => setIsPluginQueryModalOpen(true)}
                       className="w-full bg-pink-50 hover:bg-pink-100 text-pink-700 border border-pink-200 rounded-lg px-6 py-3 h-auto"
                     >
                       Get the Plugin
@@ -1106,6 +1156,133 @@ export default function LandingPage() {
         onClose={() => setIsAuthModalOpen(false)}
         initialMode="signup-vendor"
       />
+
+      {/* Plugin Query Modal - Add Gifting to Your Store */}
+      <Dialog open={isPluginQueryModalOpen} onOpenChange={(open) => {
+        setIsPluginQueryModalOpen(open);
+        if (!open) {
+          setPluginQuerySuccess(false);
+          setPluginQueryForm({ name: "", email: "", phone: "", query: "" });
+        }
+      }}>
+        <DialogContent className="sm:max-w-md bg-white">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold text-gray-900">
+              Get the Plugin
+            </DialogTitle>
+            <DialogDescription className="text-gray-600">
+              Add gifting to your store. Tell us a bit about yourself and we&apos;ll get back to you.
+            </DialogDescription>
+          </DialogHeader>
+          {pluginQuerySuccess ? (
+            <div className="py-6 text-center">
+              <CheckCircle2 className="h-12 w-12 text-green-500 mx-auto mb-3" />
+              <p className="text-gray-700 font-medium">Thanks! We&apos;ll be in touch soon.</p>
+              <Button
+                variant="outline"
+                className="mt-4"
+                onClick={() => {
+                  setIsPluginQueryModalOpen(false);
+                  setPluginQuerySuccess(false);
+                  setPluginQueryForm({ name: "", email: "", phone: "", query: "" });
+                }}
+              >
+                Close
+              </Button>
+            </div>
+          ) : (
+            <form
+              className="space-y-4"
+              onSubmit={async (e) => {
+                e.preventDefault();
+                if (pluginQuerySubmitting) return;
+                setPluginQuerySubmitting(true);
+                try {
+                  const res = await fetch("/api/plugin-query", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(pluginQueryForm),
+                  });
+                  const data = await res.json();
+                  if (!res.ok) {
+                    alert(data.error || "Failed to submit. Please try again.");
+                    setPluginQuerySubmitting(false);
+                    return;
+                  }
+                  setPluginQuerySuccess(true);
+                } catch (err) {
+                  alert("Something went wrong. Please try again.");
+                } finally {
+                  setPluginQuerySubmitting(false);
+                }
+              }}
+            >
+              <div>
+                <label htmlFor="plugin-name" className="block text-sm font-medium text-gray-700 mb-1">
+                  Name *
+                </label>
+                <Input
+                  id="plugin-name"
+                  type="text"
+                  required
+                  value={pluginQueryForm.name}
+                  onChange={(e) => setPluginQueryForm((p) => ({ ...p, name: e.target.value }))}
+                  className="w-full border-gray-200"
+                  placeholder="Your name"
+                />
+              </div>
+              <div>
+                <label htmlFor="plugin-email" className="block text-sm font-medium text-gray-700 mb-1">
+                  Email *
+                </label>
+                <Input
+                  id="plugin-email"
+                  type="email"
+                  required
+                  value={pluginQueryForm.email}
+                  onChange={(e) => setPluginQueryForm((p) => ({ ...p, email: e.target.value }))}
+                  className="w-full border-gray-200"
+                  placeholder="you@example.com"
+                />
+              </div>
+              <div>
+                <label htmlFor="plugin-phone" className="block text-sm font-medium text-gray-700 mb-1">
+                  Phone number
+                </label>
+                <Input
+                  id="plugin-phone"
+                  type="tel"
+                  value={pluginQueryForm.phone}
+                  onChange={(e) => setPluginQueryForm((p) => ({ ...p, phone: e.target.value }))}
+                  className="w-full border-gray-200"
+                  placeholder="Optional"
+                />
+              </div>
+              <div>
+                <label htmlFor="plugin-query" className="block text-sm font-medium text-gray-700 mb-1">
+                  Your query *
+                </label>
+                <textarea
+                  id="plugin-query"
+                  required
+                  rows={4}
+                  value={pluginQueryForm.query}
+                  onChange={(e) => setPluginQueryForm((p) => ({ ...p, query: e.target.value }))}
+                  className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm text-gray-900 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                  placeholder="Tell us about your store or what you need..."
+                />
+              </div>
+              <Button
+                type="submit"
+                disabled={pluginQuerySubmitting}
+                className="w-full bg-pink-500 hover:bg-pink-600 text-white"
+              >
+                {pluginQuerySubmitting ? "Submitting..." : "Submit"}
+              </Button>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
     </main>
   );
 }

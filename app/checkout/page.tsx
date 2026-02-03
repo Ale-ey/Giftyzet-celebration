@@ -21,6 +21,7 @@ function CheckoutContent() {
   const { showToast } = useToast()
   const [cartItems, setCartItems] = useState<CartItem[]>([])
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [taxPercent, setTaxPercent] = useState(8)
 
   useEffect(() => {
     // Load cart items
@@ -39,6 +40,15 @@ function CheckoutContent() {
     setIsModalOpen(true)
   }, [searchParams])
 
+  useEffect(() => {
+    fetch("/api/settings/checkout")
+      .then((res) => res.json())
+      .then((data) => {
+        if (typeof data.tax_percent === "number" && data.tax_percent >= 0) setTaxPercent(data.tax_percent)
+      })
+      .catch(() => {})
+  }, [])
+
   const handleConfirmOrder = async (orderData: OrderData) => {
     try {
       showToast("Processing your order...", "info")
@@ -53,22 +63,24 @@ function CheckoutContent() {
           : parseFloat(String(item.price))
         return sum + (isNaN(price) ? 0 : price) * item.quantity
       }, 0)
-      const shipping = subtotal > 0 ? 9.99 : 0
-      const tax = subtotal * 0.08 // 8% tax
+      const shipping = 0
+      const tax = (subtotal * taxPercent) / 100
       const total = subtotal + shipping + tax
 
-      // Prepare order items for API
+      // Prepare order items for API (services: price = per hour, quantity = hours; products: price = unit, quantity = qty)
       const orderItems = cartItems.map(item => {
-        const price = typeof item.price === 'string' 
+        const unitPrice = typeof item.price === 'string' 
           ? parseFloat(item.price.replace(/[$₹]/g, ""))
           : parseFloat(String(item.price))
+        const price = isNaN(unitPrice) ? 0 : unitPrice
+        const qty = item.quantity || 1
         return {
           item_type: item.type,
           product_id: item.type === "product" ? item.id.toString() : undefined,
           service_id: item.type === "service" ? item.id.toString() : undefined,
           name: item.name,
-          price: isNaN(price) ? 0 : price,
-          quantity: item.quantity,
+          price,
+          quantity: qty,
           image_url: item.image
         }
       })
@@ -174,6 +186,7 @@ function CheckoutContent() {
         onConfirm={handleConfirmOrder}
         cartItems={cartItems}
         orderType="self"
+        taxPercent={taxPercent}
       />
     </>
   )

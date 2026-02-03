@@ -99,8 +99,8 @@ CREATE TABLE IF NOT EXISTS public.services (
   category TEXT NOT NULL,
   image_url TEXT,
   images TEXT[], -- Array of image URLs
-  duration TEXT, -- e.g., "1 hour", "30 minutes"
   location TEXT,
+  -- price is per hour; customer chooses hours at order time
   available BOOLEAN DEFAULT true,
   rating DECIMAL(3, 2) DEFAULT 0,
   reviews_count INTEGER DEFAULT 0,

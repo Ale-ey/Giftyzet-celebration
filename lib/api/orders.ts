@@ -29,57 +29,63 @@ export interface CreateOrderData {
   total: number
 }
 
-// Create order
+// Create order (order + order_items in one transaction via RPC; trigger decreases product stock)
 export async function createOrder(orderData: CreateOrderData) {
-  // Generate gift token if gift order
-  const giftToken = orderData.order_type === 'gift' 
+  const giftToken = orderData.order_type === 'gift'
     ? `gift-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
     : null
 
-  const giftLink = giftToken 
+  const giftLink = giftToken
     ? `${typeof window !== 'undefined' ? window.location.origin : ''}/gift-receiver/${giftToken}`
     : null
 
-  // Create order
-  const { data: order, error: orderError } = await supabase
-    .from('orders')
-    .insert({
-      order_number: `ORD-${Date.now()}`,
-      user_id: orderData.user_id || null,
-      order_type: orderData.order_type,
-      sender_name: orderData.sender_name,
-      sender_email: orderData.sender_email,
-      sender_phone: orderData.sender_phone,
-      sender_address: orderData.sender_address,
-      receiver_name: orderData.receiver_name,
-      receiver_email: orderData.receiver_email,
-      receiver_phone: orderData.receiver_phone,
-      receiver_address: orderData.receiver_address,
-      shipping_address: orderData.shipping_address,
-      subtotal: orderData.subtotal,
-      shipping: orderData.shipping,
-      tax: orderData.tax,
-      total: orderData.total,
-      gift_token: giftToken,
-      gift_link: giftLink,
-      status: orderData.order_type === 'gift' ? 'pending' : 'confirmed',
-    })
-    .select()
-    .single()
+  const orderPayload = {
+    order_number: `ORD-${Date.now()}`,
+    user_id: orderData.user_id || null,
+    order_type: orderData.order_type,
+    sender_name: orderData.sender_name,
+    sender_email: orderData.sender_email,
+    sender_phone: orderData.sender_phone,
+    sender_address: orderData.sender_address,
+    receiver_name: orderData.receiver_name ?? '',
+    receiver_email: orderData.receiver_email ?? '',
+    receiver_phone: orderData.receiver_phone ?? '',
+    receiver_address: orderData.receiver_address ?? '',
+    shipping_address: orderData.shipping_address ?? '',
+    subtotal: orderData.subtotal,
+    shipping: orderData.shipping,
+    tax: orderData.tax,
+    total: orderData.total,
+    gift_token: giftToken ?? '',
+    gift_link: giftLink ?? '',
+    status: orderData.order_type === 'gift' ? 'pending' : 'confirmed',
+  }
 
-  if (orderError) throw orderError
-
-  // Create order items
-  const orderItems = orderData.items.map(item => ({
-    order_id: order.id,
-    ...item,
+  const itemsPayload = orderData.items.map((item) => ({
+    item_type: item.item_type,
+    product_id: item.product_id ?? '',
+    service_id: item.service_id ?? '',
+    name: item.name,
+    price: item.price,
+    quantity: item.quantity || 1,
+    image_url: item.image_url ?? '',
   }))
 
-  const { error: itemsError } = await supabase
-    .from('order_items')
-    .insert(orderItems)
+  const { data: orderJson, error: rpcError } = await supabase.rpc('create_order', {
+    order_data: orderPayload,
+    items_data: itemsPayload,
+  })
 
-  if (itemsError) throw itemsError
+  if (rpcError) {
+    const msg = rpcError.message || 'Failed to create order'
+    if (msg.includes('Insufficient stock') || msg.includes('stock')) {
+      throw new Error('Insufficient stock for one or more products. Please update your cart and try again.')
+    }
+    throw new Error(msg)
+  }
+
+  const order = orderJson as any
+  if (!order?.id) throw new Error('Order was not created')
 
   // Create vendor orders (group by vendor/store)
   const vendorOrderMap = new Map<string, { vendorId: string; storeId: string }>()
@@ -212,12 +218,11 @@ export async function updateOrderStatus(orderId: string, status: 'pending' | 'co
 }
 
 // Update vendor order status
+// Note: vendor_orders has status and delivered_at only (no dispatched_at column); orders table has dispatched_at
 export async function updateVendorOrderStatus(orderId: string, vendorId: string, status: 'pending' | 'confirmed' | 'dispatched' | 'delivered' | 'cancelled') {
   const updateData: any = { status }
-  
-  if (status === 'dispatched') {
-    // Also update main order if all vendor orders are dispatched
-    updateData.dispatched_at = new Date().toISOString()
+  if (status === 'delivered') {
+    updateData.delivered_at = new Date().toISOString()
   }
 
   const { data, error } = await supabase
@@ -233,6 +238,9 @@ export async function updateVendorOrderStatus(orderId: string, vendorId: string,
   // Update main order status if needed
   if (status === 'dispatched') {
     await updateOrderStatus(orderId, 'dispatched')
+  }
+  if (status === 'delivered') {
+    await updateOrderStatus(orderId, 'delivered')
   }
 
   return data

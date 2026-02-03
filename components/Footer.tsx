@@ -1,14 +1,12 @@
 "use client";
 
 import {
-  Gift,
   Heart,
   Mail,
-  Phone,
   MapPin,
   Twitter,
   Instagram,
-  Facebook,
+  Linkedin,
 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
@@ -38,13 +36,22 @@ export default function Footer() {
             </p>
             <div className="flex space-x-4">
               <a
-                href="https://twitter.com/giftyzel"
+                href="https://x.com/GiftyZelle"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-gray-600 hover:text-primary transition-colors"
-                aria-label="Follow us on Twitter"
+                aria-label="Follow us on X"
               >
                 <Twitter className="h-5 w-5" />
+              </a>
+              <a
+                href="https://www.linkedin.com/company/giftyzelle/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-gray-600 hover:text-primary transition-colors"
+                aria-label="Follow us on LinkedIn"
+              >
+                <Linkedin className="h-5 w-5" />
               </a>
               <a
                 href="https://instagram.com/giftyzel"
@@ -55,21 +62,12 @@ export default function Footer() {
               >
                 <Instagram className="h-5 w-5" />
               </a>
-              <a
-                href="https://facebook.com/giftyzel"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-gray-600 hover:text-primary transition-colors"
-                aria-label="Follow us on Facebook"
-              >
-                <Facebook className="h-5 w-5" />
-              </a>
             </div>
           </div>
 
-          {/* Contact Details */}
+          {/* Contact & FAQ */}
           <div className="space-y-4">
-            <h4 className="text-lg font-semibold text-gray-900">Contact Us</h4>
+            <h4 className="text-lg font-semibold text-gray-900">Contact & FAQ</h4>
             <div className="space-y-3">
               <div className="flex items-start space-x-3">
                 <Mail className="h-5 w-5 text-primary mt-0.5" />
@@ -84,25 +82,19 @@ export default function Footer() {
                 </div>
               </div>
               <div className="flex items-start space-x-3">
-                <Phone className="h-5 w-5 text-primary mt-0.5" />
-                <div>
-                  <div className="text-sm font-medium text-gray-900">Phone</div>
-                  <a
-                    href="tel:18004438995"
-                    className="text-sm text-gray-600 hover:text-primary transition-colors"
-                  >
-                    1-800-GIFTYZEL
-                  </a>
-                </div>
-              </div>
-              <div className="flex items-start space-x-3">
                 <MapPin className="h-5 w-5 text-primary mt-0.5" />
                 <div>
-                  <div className="text-sm font-medium text-gray-900">
-                    Location
-                  </div>
+                  <div className="text-sm font-medium text-gray-900">Location</div>
                   <div className="text-sm text-gray-600">Houston, TX</div>
                 </div>
+              </div>
+              <div>
+                <Link
+                  href="/faq"
+                  className="text-sm text-gray-600 hover:text-primary transition-colors"
+                >
+                  FAQ
+                </Link>
               </div>
             </div>
           </div>

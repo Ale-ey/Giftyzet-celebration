@@ -169,22 +169,30 @@ export async function getTopVendorsByRating(limit?: number) {
         .eq('store_id', store.id)
         .eq('available', true)
 
-      // Get total orders count for this store
+      // Get total orders count for this store (delivered = completed orders; vendor_orders has no 'completed' status)
       const { count: ordersCount } = await supabase
         .from('vendor_orders')
         .select('*', { count: 'exact', head: true })
         .eq('store_id', store.id)
-        .eq('status', 'completed')
+        .eq('status', 'delivered')
 
-      // Get average rating from reviews
-      const { data: reviews } = await supabase
-        .from('reviews')
-        .select('rating')
-        .or(`product_id.in.(select id from products where store_id='${store.id}'),service_id.in.(select id from services where store_id='${store.id}')`)
-
-      const avgRating = reviews && reviews.length > 0
-        ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length
-        : 0
+      // Store rating = average of all product and service ratings for this store (same as store detail page)
+      const { data: productsForRating } = await supabase
+        .from('products')
+        .select('rating, reviews_count')
+        .eq('store_id', store.id)
+      const { data: servicesForRating } = await supabase
+        .from('services')
+        .select('rating, reviews_count')
+        .eq('store_id', store.id)
+      const allItemsForRating = [...(productsForRating || []), ...(servicesForRating || [])]
+      const totalReviews = allItemsForRating.reduce((sum, item) => sum + (item.reviews_count || 0), 0)
+      // Weighted average: sum(rating * reviews_count) / totalReviews so store rating reflects all reviews
+      const avgRating = totalReviews > 0
+        ? allItemsForRating.reduce((sum, item) => sum + (item.rating || 0) * (item.reviews_count || 0), 0) / totalReviews
+        : allItemsForRating.length > 0
+          ? allItemsForRating.reduce((sum, item) => sum + (item.rating || 0), 0) / allItemsForRating.length
+          : 0
 
       const vendor = Array.isArray(store.vendors) ? store.vendors[0] : store.vendors
       
@@ -197,7 +205,7 @@ export async function getTopVendorsByRating(limit?: number) {
         vendor_name: vendor?.vendor_name || vendor?.business_name || 'Unknown',
         vendor_id: vendor?.id,
         rating: Math.round(avgRating * 10) / 10,
-        totalReviews: reviews?.length || 0,
+        totalReviews,
         totalProducts: (productCount || 0) + (serviceCount || 0),
         totalSales: ordersCount || 0,
         verified: true,
@@ -455,19 +463,21 @@ export async function getStoreWithStats(storeId: string) {
     .eq('store_id', storeId)
     .eq('available', true)
 
-  // Calculate average rating and total reviews
+  // Store rating = weighted average of all product and service ratings (by reviews_count)
   const allItems = [...(products || []), ...(services || [])]
   const totalReviews = allItems.reduce((sum, item) => sum + (item.reviews_count || 0), 0)
-  const avgRating = allItems.length > 0
-    ? allItems.reduce((sum, item) => sum + (item.rating || 0), 0) / allItems.length
-    : 0
+  const avgRating = totalReviews > 0
+    ? allItems.reduce((sum, item) => sum + (item.rating || 0) * (item.reviews_count || 0), 0) / totalReviews
+    : allItems.length > 0
+      ? allItems.reduce((sum, item) => sum + (item.rating || 0), 0) / allItems.length
+      : 0
 
-  // Get completed orders count
+  // Get delivered orders count (vendor_orders uses 'delivered', not 'completed')
   const { count: ordersCount } = await supabase
     .from('vendor_orders')
     .select('*', { count: 'exact', head: true })
     .eq('store_id', storeId)
-    .eq('status', 'completed')
+    .eq('status', 'delivered')
 
   return {
     ...store,

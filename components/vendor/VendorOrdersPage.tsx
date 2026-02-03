@@ -60,7 +60,7 @@ export default function VendorOrdersPage() {
         // Fetch vendor orders from API
         const vendorOrders = await getOrdersByVendorId(vendorData.id)
         
-        // Transform the data to match the expected format
+        // Transform the data to match the expected format (services: quantity = hours, price = per hour)
         const formattedOrders = vendorOrders.map((vo: any) => ({
           id: vo.orders.id,
           orderNumber: vo.orders.order_number,
@@ -69,30 +69,38 @@ export default function VendorOrdersPage() {
           status: vo.status,
           total: parseFloat(vo.orders.total),
           orderType: vo.orders.order_type,
-          // Sender details
           senderName: vo.orders.sender_name,
           senderEmail: vo.orders.sender_email,
           senderPhone: vo.orders.sender_phone,
           senderAddress: vo.orders.sender_address,
-          // Receiver details (for gift orders)
           receiverName: vo.orders.receiver_name,
           receiverEmail: vo.orders.receiver_email,
           receiverPhone: vo.orders.receiver_phone,
           receiverAddress: vo.orders.receiver_address,
-          // Shipping address (for self orders)
           shippingAddress: vo.orders.shipping_address,
-          items: vo.orders.order_items?.map((item: any) => ({
-            name: item.name,
-            type: item.item_type,
-            quantity: item.quantity,
-            price: `$${parseFloat(item.price).toFixed(2)}`,
-            image: item.image_url
-          })) || [],
+          items: vo.orders.order_items?.map((item: any) => {
+            const qty = item.quantity ?? 1
+            const unitPrice = parseFloat(item.price) || 0
+            const lineTotal = unitPrice * qty
+            const isService = item.item_type === "service"
+            return {
+              name: item.name,
+              type: item.item_type,
+              quantity: qty,
+              price: `$${lineTotal.toFixed(2)}`,
+              pricePerUnit: unitPrice,
+              image: item.image_url,
+              product_id: item.product_id,
+              service_id: item.service_id,
+              isService,
+              hours: isService ? qty : null
+            }
+          }) || [],
           createdAt: vo.orders.created_at,
           confirmedAt: vo.orders.confirmed_at,
           dispatchedAt: vo.orders.dispatched_at,
           deliveredAt: vo.orders.delivered_at,
-          fullOrder: vo.orders // Keep full order data for modal
+          fullOrder: vo.orders
         }))
 
         setOrders(formattedOrders)
@@ -133,6 +141,15 @@ export default function VendorOrdersPage() {
       showToast(error.message || "Failed to update order status", "error")
     }
   }
+
+  const statusOptions = [
+    { value: "all", label: "All" },
+    { value: "pending", label: "Pending" },
+    { value: "confirmed", label: "Confirmed" },
+    { value: "dispatched", label: "Dispatched" },
+    { value: "delivered", label: "Delivered" },
+    { value: "cancelled", label: "Cancelled" }
+  ]
 
   const filteredOrders = filter === "all" 
     ? orders 
@@ -203,7 +220,7 @@ export default function VendorOrdersPage() {
       <div className="container mx-auto px-4 py-8">
         <Button
           variant="ghost"
-          onClick={() => router.push("/vendor/dashboard")}
+          onClick={() => router.push("/vendor")}
           className="mb-6 text-gray-900 hover:text-primary hover:bg-primary/10"
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
@@ -215,51 +232,24 @@ export default function VendorOrdersPage() {
           <p className="text-gray-600">Manage and track customer orders</p>
         </div>
 
-        {/* Filters */}
-        <div className="flex gap-2 mb-6 flex-wrap">
-          <Button
-            variant={filter === "all" ? "default" : "outline"}
-            onClick={() => handleFilterChange("all")}
-            className={filter === "all" 
-              ? "bg-primary text-white" 
-              : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
-            }
+        {/* Filter dropdown */}
+        <div className="flex items-center gap-4 mb-6">
+          <label htmlFor="status-filter" className="text-sm font-medium text-gray-700">Filter by status:</label>
+          <select
+            id="status-filter"
+            value={filter}
+            onChange={(e) => handleFilterChange(e.target.value)}
+            className="rounded-md border border-gray-200 bg-white px-3 py-2 text-gray-900 shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary min-w-[160px]"
           >
-            All ({orders.length})
-          </Button>
-          <Button
-            variant={filter === "pending" ? "default" : "outline"}
-            onClick={() => handleFilterChange("pending")}
-            className={filter === "pending" 
-              ? "bg-primary text-white" 
-              : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
-            }
-          >
-            Pending ({orders.filter((o) => o.status === "pending").length})
-          </Button>
-          <Button
-            variant={filter === "confirmed" ? "default" : "outline"}
-            onClick={() => handleFilterChange("confirmed")}
-            className={filter === "confirmed" 
-              ? "bg-primary text-white" 
-              : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
-            }
-          >
-            Confirmed ({orders.filter((o) => o.status === "confirmed").length})
-          </Button>
-          <Button
-            variant={filter === "dispatched" ? "default" : "outline"}
-            onClick={() => handleFilterChange("dispatched")}
-            className={filter === "dispatched" 
-              ? "bg-primary text-white" 
-              : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
-            }
-          >
-            Dispatched ({orders.filter((o) => o.status === "dispatched").length})
-          </Button>
+            {statusOptions.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label} {opt.value === "all" ? `(${orders.length})` : `(${orders.filter((o) => o.status === opt.value).length})`}
+              </option>
+            ))}
+          </select>
         </div>
 
-        {/* Orders List */}
+        {/* Orders Table */}
         {filteredOrders.length === 0 ? (
           <Card className="border border-gray-200 bg-white">
             <CardContent className="p-12 text-center">
@@ -275,83 +265,85 @@ export default function VendorOrdersPage() {
           </Card>
         ) : (
           <>
-            <div className="space-y-4">
-              {paginatedOrders.map((order) => (
-              <Card 
-                key={order.id} 
-                className="border border-gray-200 bg-white cursor-pointer hover:shadow-md transition-shadow"
-                onClick={() => {
-                  setSelectedOrder(order)
-                  setIsOrderModalOpen(true)
-                }}
-              >
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <CardTitle className="text-gray-900">Order #{order.orderNumber}</CardTitle>
-                      <CardDescription className="text-gray-600">
-                        {order.customerName} ({order.customerEmail})
-                      </CardDescription>
-                    </div>
-                    {getStatusBadge(order.status)}
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {/* Order Items Preview */}
-                    <div>
-                      <h4 className="font-semibold text-gray-900 mb-2">Items ({order.items.length}):</h4>
-                      <div className="space-y-2">
-                        {order.items.slice(0, 2).map((item: any, idx: number) => (
-                          <div key={idx} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                            <div className="flex items-center gap-3">
-                              {item.image && (
-                                <img
-                                  src={item.image}
-                                  alt={item.name}
-                                  className="w-12 h-12 object-cover rounded"
-                                />
-                              )}
-                              <div>
-                                <p className="font-medium text-gray-900">{item.name}</p>
-                                <p className="text-sm text-gray-600">
-                                  {item.type === "product" ? "Product" : "Service"} • Qty: {item.quantity}
-                                </p>
-                              </div>
-                            </div>
-                            <p className="font-semibold text-gray-900">{item.price}</p>
-                          </div>
-                        ))}
-                        {order.items.length > 2 && (
-                          <p className="text-sm text-gray-500 text-center py-2">
-                            +{order.items.length - 2} more item(s) - Click to view details
-                          </p>
+            <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
+              <table className="w-full text-left">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th className="px-4 py-3 text-sm font-semibold text-gray-900">Order #</th>
+                    <th className="px-4 py-3 text-sm font-semibold text-gray-900">Customer</th>
+                    <th className="px-4 py-3 text-sm font-semibold text-gray-900">Date</th>
+                    <th className="px-4 py-3 text-sm font-semibold text-gray-900">Items</th>
+                    <th className="px-4 py-3 text-sm font-semibold text-gray-900">Total</th>
+                    <th className="px-4 py-3 text-sm font-semibold text-gray-900">Status</th>
+                    <th className="px-4 py-3 text-sm font-semibold text-gray-900">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paginatedOrders.map((order) => (
+                    <tr
+                      key={order.id}
+                      className="border-b border-gray-100 hover:bg-gray-50/50"
+                    >
+                      <td className="px-4 py-3">
+                        <span className="font-medium text-gray-900">{order.orderNumber}</span>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-600">
+                        {order.customerName}
+                        <br />
+                        <span className="text-xs text-gray-500">{order.customerEmail}</span>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-600">
+                        {new Date(order.createdAt).toLocaleDateString()}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-600">
+                        {order.items.length} item(s)
+                        {order.items.some((i: any) => i.isService) && (
+                          <span className="block text-xs text-gray-500 mt-0.5">
+                            {order.items.filter((i: any) => i.isService).map((i: any) => `${i.hours}h`).join(", ")} service
+                          </span>
                         )}
-                      </div>
-                    </div>
-
-                    {/* Order Total */}
-                    <div className="flex justify-between items-center pt-2 border-t border-gray-200">
-                      <span className="font-semibold text-gray-900">Total:</span>
-                      <span className="text-xl font-bold text-gray-900">${order.total.toFixed(2)}</span>
-                    </div>
-
-                    {/* Order Date */}
-                    <p className="text-sm text-gray-600">
-                      Ordered: {new Date(order.createdAt).toLocaleDateString()}
-                    </p>
-
-                    {/* Click hint */}
-                    <p className="text-xs text-gray-500 text-center pt-2 border-t border-gray-100">
-                      Click anywhere on this card to view full order details
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-              ))}
+                      </td>
+                      <td className="px-4 py-3 font-semibold text-gray-900">${order.total.toFixed(2)}</td>
+                      <td className="px-4 py-3">
+                        <select
+                          value={order.status}
+                          onChange={(e) => {
+                            e.stopPropagation()
+                            const newStatus = e.target.value
+                            if (newStatus !== order.status) {
+                              handleStatusUpdate(order.id, newStatus)
+                            }
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                          className="rounded border border-gray-200 bg-white px-2 py-1.5 text-sm text-gray-900 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                        >
+                          <option value="pending">Pending</option>
+                          <option value="confirmed">Confirmed</option>
+                          <option value="dispatched">Dispatched</option>
+                          <option value="delivered">Delivered</option>
+                          <option value="cancelled">Cancelled</option>
+                        </select>
+                      </td>
+                      <td className="px-4 py-3">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setSelectedOrder(order)
+                            setIsOrderModalOpen(true)
+                          }}
+                          className="bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300"
+                        >
+                          View
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
 
-            {/* Pagination */}
             <Pagination
               currentPage={currentPage}
               totalPages={totalPages}

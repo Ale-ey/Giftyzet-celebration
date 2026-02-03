@@ -393,7 +393,6 @@ export const initializeDummyVendorServices = (vendorName?: string): void => {
       image: "https://images.unsplash.com/photo-1544161515-4ab6ce6db874?w=300&h=300&fit=crop",
       discount: "19% OFF",
       description: "Relaxing full body massage to relieve stress and tension. Includes aromatherapy oils.",
-      duration: "90 minutes",
       location: "On-site"
     },
     {
@@ -408,7 +407,6 @@ export const initializeDummyVendorServices = (vendorName?: string): void => {
       image: "https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?w=300&h=300&fit=crop",
       discount: "25% OFF",
       description: "Professional facial treatment with extraction, mask, and hydration.",
-      duration: "60 minutes",
       location: "On-site"
     },
     {
@@ -423,7 +421,6 @@ export const initializeDummyVendorServices = (vendorName?: string): void => {
       image: "https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?w=300&h=300&fit=crop",
       discount: "22% OFF",
       description: "Complete nail care service including shaping, cuticle care, and polish.",
-      duration: "75 minutes",
       location: "On-site"
     },
 
@@ -440,7 +437,6 @@ export const initializeDummyVendorServices = (vendorName?: string): void => {
       image: "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=300&h=300&fit=crop",
       discount: "25% OFF",
       description: "Personal chef comes to your home to prepare a gourmet multi-course meal.",
-      duration: "3-4 hours",
       location: "At your location"
     },
     {
@@ -455,7 +451,6 @@ export const initializeDummyVendorServices = (vendorName?: string): void => {
       image: "https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?w=300&h=300&fit=crop",
       discount: "20% OFF",
       description: "Guided wine tasting session with expert sommelier and cheese pairing.",
-      duration: "2 hours",
       location: "Restaurant"
     },
     {
@@ -470,7 +465,6 @@ export const initializeDummyVendorServices = (vendorName?: string): void => {
       image: "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=300&h=300&fit=crop",
       discount: "25% OFF",
       description: "Romantic cooking class where couples learn to prepare a gourmet meal together.",
-      duration: "3 hours",
       location: "On-site"
     },
 
@@ -487,7 +481,6 @@ export const initializeDummyVendorServices = (vendorName?: string): void => {
       image: "https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=300&h=300&fit=crop",
       discount: "20% OFF",
       description: "Full home organization service including decluttering, sorting, and storage solutions.",
-      duration: "Full day",
       location: "At your location"
     },
     {
@@ -502,7 +495,6 @@ export const initializeDummyVendorServices = (vendorName?: string): void => {
       image: "https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=300&h=300&fit=crop",
       discount: "20% OFF",
       description: "Professional closet organization with custom storage solutions and styling.",
-      duration: "4-6 hours",
       location: "At your location"
     },
     {
@@ -517,7 +509,6 @@ export const initializeDummyVendorServices = (vendorName?: string): void => {
       image: "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=300&h=300&fit=crop",
       discount: "17% OFF",
       description: "Expert consultation and organization of your kitchen space for maximum efficiency.",
-      duration: "3-4 hours",
       location: "At your location"
     },
 
@@ -534,7 +525,6 @@ export const initializeDummyVendorServices = (vendorName?: string): void => {
       image: "https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=300&h=300&fit=crop",
       discount: "25% OFF",
       description: "One-on-one yoga session tailored to your fitness level and goals.",
-      duration: "60 minutes",
       location: "Studio or Home"
     },
     {
@@ -549,7 +539,6 @@ export const initializeDummyVendorServices = (vendorName?: string): void => {
       image: "https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=300&h=300&fit=crop",
       discount: "25% OFF",
       description: "Learn meditation techniques and mindfulness practices for stress relief.",
-      duration: "90 minutes",
       location: "On-site"
     },
     {
@@ -564,7 +553,6 @@ export const initializeDummyVendorServices = (vendorName?: string): void => {
       image: "https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=300&h=300&fit=crop",
       discount: "25% OFF",
       description: "Weekend yoga retreat with multiple classes, meditation, and healthy meals.",
-      duration: "2 days",
       location: "Retreat Center"
     },
 
@@ -581,7 +569,6 @@ export const initializeDummyVendorServices = (vendorName?: string): void => {
       image: "https://images.unsplash.com/photo-1558618047-3c8c76ca7d13?w=300&h=300&fit=crop",
       discount: "20% OFF",
       description: "Comprehensive deep cleaning of entire home including all rooms and appliances.",
-      duration: "4-6 hours",
       location: "At your location"
     },
     {
@@ -596,7 +583,6 @@ export const initializeDummyVendorServices = (vendorName?: string): void => {
       image: "https://images.unsplash.com/photo-1558618047-3c8c76ca7d13?w=300&h=300&fit=crop",
       discount: "17% OFF",
       description: "Thorough cleaning service for moving in or out of a property.",
-      duration: "5-7 hours",
       location: "At your location"
     },
     {
@@ -611,7 +597,6 @@ export const initializeDummyVendorServices = (vendorName?: string): void => {
       image: "https://images.unsplash.com/photo-1558618047-3c8c76ca7d13?w=300&h=300&fit=crop",
       discount: "19% OFF",
       description: "Weekly or bi-weekly cleaning service to keep your home spotless.",
-      duration: "2-3 hours",
       location: "At your location"
     }
   ]
@@ -631,7 +616,6 @@ export const initializeDummyVendorServices = (vendorName?: string): void => {
         image: "https://images.unsplash.com/photo-1544161515-4ab6ce6db874?w=300&h=300&fit=crop",
         discount: "25% OFF",
         description: "Expert consultation service to help you achieve your goals.",
-        duration: "60 minutes",
         location: "At your location"
       },
       {
@@ -646,7 +630,6 @@ export const initializeDummyVendorServices = (vendorName?: string): void => {
         image: "https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?w=300&h=300&fit=crop",
         discount: "19% OFF",
         description: "Comprehensive treatment package for complete relaxation and rejuvenation.",
-        duration: "90 minutes",
         location: "On-site"
       },
       {
@@ -661,7 +644,6 @@ export const initializeDummyVendorServices = (vendorName?: string): void => {
         image: "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=300&h=300&fit=crop",
         discount: "23% OFF",
         description: "Personalized experience session tailored to your preferences.",
-        duration: "2-3 hours",
         location: "On-site"
       },
       {
@@ -676,7 +658,6 @@ export const initializeDummyVendorServices = (vendorName?: string): void => {
         image: "https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=300&h=300&fit=crop",
         discount: "20% OFF",
         description: "All-inclusive service solution covering all your needs.",
-        duration: "Full day",
         location: "At your location"
       },
       {
@@ -691,7 +672,6 @@ export const initializeDummyVendorServices = (vendorName?: string): void => {
         image: "https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=300&h=300&fit=crop",
         discount: "20% OFF",
         description: "Relaxing wellness session to help you unwind and recharge.",
-        duration: "60 minutes",
         location: "Studio or Home"
       }
     ]

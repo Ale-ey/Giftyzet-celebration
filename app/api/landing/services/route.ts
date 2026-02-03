@@ -17,7 +17,6 @@ export async function GET(request: NextRequest) {
         description,
         category,
         price,
-        duration,
         image_url,
         location,
         rating,
@@ -54,7 +53,6 @@ export async function GET(request: NextRequest) {
           description,
           category,
           price,
-          duration,
           image_url,
           location,
           rating,
@@ -82,7 +80,7 @@ export async function GET(request: NextRequest) {
       console.error("Error fetching services:", error)
       let fallbackQuery = supabase
         .from("services")
-        .select("id, name, description, category, price, duration, image_url, location, rating, available")
+        .select("id, name, description, category, price, image_url, location, rating, available")
         .eq("available", true)
         .order("rating", { ascending: false, nullsFirst: false })
         .order("created_at", { ascending: false })
@@ -108,7 +106,6 @@ export async function GET(request: NextRequest) {
           description: s.description,
           category: s.category,
           price_per_hour: parseFloat(s.price) || 0,
-          duration_hours: s.duration ? parseInt(s.duration) : 1,
           image_url: s.image_url,
           location: s.location,
           rating: parseFloat(s.rating) || 0,
@@ -140,7 +137,6 @@ export async function GET(request: NextRequest) {
       description: service.description,
       category: service.category,
       price_per_hour: parseFloat(service.price) || 0,
-      duration_hours: service.duration ? parseInt(service.duration) : 1,
       image_url: service.image_url,
       location: service.location,
       rating: parseFloat(service.rating) || 0,

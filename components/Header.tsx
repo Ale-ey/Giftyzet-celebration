@@ -14,7 +14,6 @@ import {
   Heart,
   Gift,
   ShoppingCart,
-  Bell,
   Store,
   ShoppingBag,
   Wrench,
@@ -251,21 +250,6 @@ export default function Header() {
               )}
             </Button>
 
-            {/* Notifications */}
-            {isLoggedIn && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => router.push("/notifications")}
-                className="relative text-gray-900 hover:text-primary hover:bg-primary/10 transition-colors"
-              >
-                <Bell className="h-4 w-4" />
-                <span className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                  3
-                </span>
-              </Button>
-            )}
-
             {isLoggedIn ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -364,19 +348,6 @@ export default function Header() {
                 </span>
               )}
             </Button>
-            {isLoggedIn && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => router.push("/notifications")}
-                className="relative p-2 text-gray-900"
-              >
-                <Bell className="h-5 w-5" />
-                <span className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground text-xs rounded-full w-4 h-4 flex items-center justify-center">
-                  3
-                </span>
-              </Button>
-            )}
             <Button
               variant="ghost"
               size="sm"
@@ -469,24 +440,6 @@ export default function Header() {
                       </span>
                     )}
                   </Button>
-
-                  {/* Notifications */}
-                  {isLoggedIn && (
-                    <Button
-                      variant="ghost"
-                      className="justify-start w-full text-gray-900 hover:text-primary hover:bg-primary/10 transition-colors"
-                      onClick={() => {
-                        router.push("/notifications");
-                        setIsMenuOpen(false);
-                      }}
-                    >
-                      <Bell className="h-4 w-4 mr-2" />
-                      Notifications
-                      <span className="ml-auto bg-destructive text-destructive-foreground text-xs rounded-full px-2 py-0.5">
-                        3
-                      </span>
-                    </Button>
-                  )}
 
                   {isLoggedIn ? (
                     <>

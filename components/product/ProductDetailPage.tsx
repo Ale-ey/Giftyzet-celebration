@@ -7,7 +7,47 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
 import { getProduct } from "@/lib/api/products"
+import { getReviewsForProduct } from "@/lib/api/reviews"
 import { useToast } from "@/components/ui/toast"
+
+function ProductReviews({ productId }: { productId: string }) {
+  const [reviews, setReviews] = useState<Array<{ id: string; rating: number; comment: string | null; created_at: string; users: { name: string | null } | null }>>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    getReviewsForProduct(productId)
+      .then(setReviews)
+      .catch(() => setReviews([]))
+      .finally(() => setLoading(false))
+  }, [productId])
+
+  if (loading) return <div className="text-sm text-gray-500 mt-4">Loading reviews...</div>
+  if (reviews.length === 0) return <div className="text-sm text-gray-500 mt-4">No reviews yet.</div>
+
+  return (
+    <Card className="border border-gray-200 bg-gray-50/50 mt-6">
+      <CardContent className="p-6">
+        <h3 className="font-semibold text-gray-700 mb-4">Customer Reviews</h3>
+        <div className="space-y-4">
+          {reviews.map((r) => (
+            <div key={r.id} className="border-b border-gray-100 pb-4 last:border-0 last:pb-0">
+              <div className="flex items-center gap-2 mb-1">
+                <div className="flex items-center gap-0.5">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <Star key={star} className={`h-4 w-4 ${star <= r.rating ? 'text-yellow-500 fill-yellow-500' : 'text-gray-300'}`} />
+                  ))}
+                </div>
+                <span className="text-sm font-medium text-gray-700">{r.users?.name ?? 'Customer'}</span>
+                <span className="text-xs text-gray-400">{new Date(r.created_at).toLocaleDateString()}</span>
+              </div>
+              {r.comment && <p className="text-sm text-gray-600 mt-1">{r.comment}</p>}
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
 
 export default function ProductDetailPage({ productId }: { productId: string }) {
   const router = useRouter()
@@ -184,13 +224,22 @@ export default function ProductDetailPage({ productId }: { productId: string }) 
               <Badge variant="outline" className="mb-3 border-gray-200 bg-white text-gray-600">
                 {product.category}
               </Badge>
-              <h1 className="text-4xl font-semibold text-gray-800 mb-4">{product.name}</h1>
-              
-              <p className="text-gray-500 mb-4">
-                by <span className="font-medium text-gray-700">
-                  {product.stores?.vendors?.vendor_name || product.stores?.name || 'Unknown Vendor'}
+              <h1 className="text-4xl font-semibold text-gray-800 mb-3">{product.name}</h1>
+
+              {/* Average rating under title */}
+              <div className="flex items-center gap-2 mb-4">
+                <div className="flex items-center gap-0.5">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <Star
+                      key={star}
+                      className={`h-5 w-5 ${star <= (product.rating ?? 0) ? 'text-yellow-500 fill-yellow-500' : 'text-gray-300'}`}
+                    />
+                  ))}
+                </div>
+                <span className="text-sm text-gray-600">
+                  {Number(product.rating ?? 0).toFixed(1)} · {(product.reviews_count ?? 0)} reviews
                 </span>
-              </p>
+              </div>
               
               {/* Product Description */}
               {product.description && (
@@ -293,22 +342,12 @@ export default function ProductDetailPage({ productId }: { productId: string }) 
                     <span className="font-medium text-gray-700">{product.category}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-500">Store</span>
-                    <span className="font-medium text-gray-700">{product.stores?.name || 'N/A'}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Vendor</span>
-                    <span className="font-medium text-gray-700">
-                      {product.stores?.vendors?.vendor_name || 'N/A'}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
                     <span className="text-gray-500">Availability</span>
                     <span className="font-medium text-gray-700">
                       {product.available ? 'In Stock' : 'Out of Stock'}
                     </span>
                   </div>
-                  {product.stock && (
+                  {product.stock != null && (
                     <div className="flex justify-between">
                       <span className="text-gray-500">Stock</span>
                       <span className="font-medium text-gray-700">{product.stock} units</span>
@@ -317,6 +356,9 @@ export default function ProductDetailPage({ productId }: { productId: string }) 
                 </div>
               </CardContent>
             </Card>
+
+            {/* Reviews */}
+            <ProductReviews productId={product.id} />
           </div>
         </div>
       </div>

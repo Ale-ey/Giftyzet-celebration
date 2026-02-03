@@ -94,30 +94,31 @@ export default function VendorStorePage({ vendorName }: VendorStorePageProps) {
     })
   }, [allItems, searchQuery, selectedCategory])
 
-  const handleAddToCart = (item: any) => {
+  const handleAddToCart = (item: any, hours: number = 1) => {
+    const isService = item.type === "service"
+    const unitPrice = typeof item.price === "number" ? item.price : parseFloat(String(item.price)) || 0
     const cartItem = {
       id: item.id,
       name: item.name,
-      price: `$${item.price}`,
+      price: unitPrice,
       image: item.image_url,
-      quantity: 1,
-      type: item.type,
-      vendor: storeData?.name || vendorName
+      quantity: isService ? hours : 1,
+      type: item.type || "product",
+      vendor: storeData?.stores?.name || storeData?.name || vendorName,
+      category: item.category,
+      store_id: item.store_id,
+      ...(isService ? {} : { originalPrice: item.original_price != null ? `$${item.original_price}` : undefined })
     }
     const existingCart = JSON.parse(localStorage.getItem("cart") || "[]")
-    const existingItemIndex = existingCart.findIndex((cartItem: any) => 
-      cartItem.id === item.id && cartItem.type === item.type
-    )
-    
+    const existingItemIndex = existingCart.findIndex((c: any) => c.id === item.id && (c.type || "product") === (item.type || "product"))
     if (existingItemIndex >= 0) {
-      existingCart[existingItemIndex].quantity += 1
+      existingCart[existingItemIndex].quantity += isService ? hours : 1
     } else {
       existingCart.push(cartItem)
     }
-    
     localStorage.setItem("cart", JSON.stringify(existingCart))
     window.dispatchEvent(new Event("cartUpdated"))
-    alert(`Added ${item.name} to cart!`)
+    alert(isService ? `Added ${hours} ${hours === 1 ? "hour" : "hours"} of ${item.name} to cart!` : `Added ${item.name} to cart!`)
   }
 
   const handleBuyNow = (item: any) => {
@@ -371,7 +372,7 @@ export default function VendorStorePage({ vendorName }: VendorStorePageProps) {
                     </Badge>
                     <div className="flex items-center text-xs text-gray-600 font-medium">
                       <Star className="h-3.5 w-3.5 fill-current text-yellow-500 mr-1" />
-                      {item.rating || 0} ({item.reviews_count || 0})
+                      {Number(item.rating ?? 0).toFixed(1)} ({(item.reviews_count ?? 0)} reviews)
                     </div>
                   </div>
 

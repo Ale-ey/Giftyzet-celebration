@@ -44,7 +44,6 @@ export interface Service {
   image: string
   discount: string
   description?: string
-  duration?: string
   location?: string
   available?: boolean
 }

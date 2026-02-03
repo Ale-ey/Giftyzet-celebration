@@ -258,11 +258,11 @@ export default function MarketplacePage() {
                         
                         <div className="flex items-center gap-1 mb-3">
                           <div className="flex">
-                            {[...Array(5)].map((_, i) => (
+                            {[1, 2, 3, 4, 5].map((star) => (
                               <Star
-                                key={i}
+                                key={star}
                                 className={`h-3 w-3 ${
-                                  i < Math.floor(product.rating || 0)
+                                  star <= Math.round(Number(product.rating) || 0)
                                     ? "fill-yellow-400 text-yellow-400"
                                     : "fill-gray-200 text-gray-200"
                                 }`}
@@ -270,7 +270,7 @@ export default function MarketplacePage() {
                             ))}
                           </div>
                           <span className="text-xs text-gray-600">
-                            ({product.reviews_count || 0})
+                            {Number(product.rating ?? 0).toFixed(1)} ({(product.reviews_count ?? 0)} reviews)
                           </span>
                         </div>
 

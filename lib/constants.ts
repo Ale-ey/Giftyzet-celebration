@@ -189,7 +189,6 @@ export const allServices: Service[] = [
     image: "https://images.unsplash.com/photo-1544161515-4ab6ce6db874?w=300&h=300&fit=crop",
     discount: "Limited Time",
     description: "A luxurious full-day spa experience including massage, facial treatment, aromatherapy, and access to premium facilities. The perfect gift for relaxation and rejuvenation.",
-    duration: "Full Day",
     location: "On-site"
   },
   {
@@ -204,7 +203,6 @@ export const allServices: Service[] = [
     image: "https://images.unsplash.com/photo-1558618047-3c8c76ca7d13?w=300&h=300&fit=crop",
     discount: "First Time",
     description: "Professional deep cleaning service for your entire home. Our experienced team uses eco-friendly products to leave your space spotless and fresh.",
-    duration: "3-4 hours",
     location: "At your location"
   },
   {
@@ -219,7 +217,6 @@ export const allServices: Service[] = [
     image: "https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=300&h=300&fit=crop",
     discount: "First Time",
     description: "Professional home organization service to declutter and organize your living spaces. Create a more functional and peaceful home environment.",
-    duration: "4-6 hours",
     location: "At your location"
   },
   {
@@ -234,7 +231,6 @@ export const allServices: Service[] = [
     image: "https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?w=300&h=300&fit=crop",
     discount: "25% OFF",
     description: "Rejuvenating facial treatment using premium skincare products. Deep cleansing, exfoliation, and hydration to leave your skin glowing and refreshed.",
-    duration: "60 minutes",
     location: "On-site"
   },
   {
@@ -249,7 +245,6 @@ export const allServices: Service[] = [
     image: "https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=300&h=300&fit=crop",
     discount: "23% OFF",
     description: "A package of 10 yoga classes suitable for all levels. Improve flexibility, strength, and mental well-being in a peaceful studio environment.",
-    duration: "10 classes",
     location: "On-site"
   },
   {
@@ -264,7 +259,6 @@ export const allServices: Service[] = [
     image: "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=300&h=300&fit=crop",
     discount: "20% OFF",
     description: "Learn to cook like a pro in this hands-on cooking class. Master new techniques and recipes while enjoying a fun and educational experience.",
-    duration: "3 hours",
     location: "On-site"
   },
   {
@@ -279,7 +273,6 @@ export const allServices: Service[] = [
     image: "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=300&h=300&fit=crop",
     discount: "Limited Time",
     description: "An exquisite dining experience featuring a multi-course meal prepared by award-winning chefs. Perfect for special occasions and romantic evenings.",
-    duration: "2-3 hours",
     location: "Restaurant"
   },
   {
@@ -294,7 +287,6 @@ export const allServices: Service[] = [
     image: "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=300&h=300&fit=crop",
     discount: "20% OFF",
     description: "One-on-one personal training session with certified fitness professionals. Customized workout plans to help you reach your fitness goals.",
-    duration: "60 minutes",
     location: "Gym or Home"
   },
   {
@@ -309,7 +301,6 @@ export const allServices: Service[] = [
     image: "https://images.unsplash.com/photo-1551717743-49959800b1f6?w=300&h=300&fit=crop",
     discount: "28% OFF",
     description: "Professional pet grooming service including bath, haircut, nail trimming, and ear cleaning. Your furry friend will look and feel amazing.",
-    duration: "2-3 hours",
     location: "On-site or Mobile"
   },
   {
@@ -324,7 +315,6 @@ export const allServices: Service[] = [
     image: "https://images.unsplash.com/photo-1416879595882-3373a0480b5b?w=300&h=300&fit=crop",
     discount: "25% OFF",
     description: "Professional landscaping service to transform your outdoor space. Includes design consultation, planting, and maintenance.",
-    duration: "Full Day",
     location: "At your location"
   },
   {
@@ -339,7 +329,6 @@ export const allServices: Service[] = [
     image: "https://images.unsplash.com/photo-1544161515-4ab6ce6db874?w=300&h=300&fit=crop",
     discount: "25% OFF",
     description: "Relaxing full-body massage therapy session to relieve stress and tension. Choose from Swedish, deep tissue, or hot stone massage.",
-    duration: "90 minutes",
     location: "On-site"
   },
   {
@@ -354,7 +343,6 @@ export const allServices: Service[] = [
     image: "https://images.unsplash.com/photo-1492691527719-9d1e07e534b4?w=300&h=300&fit=crop",
     discount: "20% OFF",
     description: "Professional photography session for portraits, events, or special occasions. Includes edited digital photos and print options.",
-    duration: "2 hours",
     location: "On-location"
   }
 ]

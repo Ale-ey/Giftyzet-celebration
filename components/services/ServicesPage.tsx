@@ -2,13 +2,14 @@
 
 import { useState, useMemo, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { Search, Filter, Star, Clock, MapPin, ShoppingCart, Gift, Wrench } from "lucide-react"
+import { Search, Filter, Star, Clock, MapPin, ShoppingCart, Wrench } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { STORE_CATEGORIES } from "@/lib/constants"
 import { getApprovedServices } from "@/lib/api/products"
+import { useToast } from "@/components/ui/toast"
 
 const categories = [
   { name: "All Categories", value: "all" },
@@ -17,6 +18,7 @@ const categories = [
 
 export default function ServicesPage() {
   const router = useRouter()
+  const { showToast } = useToast()
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedCategory, setSelectedCategory] = useState("all")
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
@@ -61,37 +63,28 @@ export default function ServicesPage() {
   }, [services, searchQuery, selectedCategory])
 
   const handleAddToCart = (service: any) => {
+    const price = typeof service.price === "number" ? service.price : parseFloat(String(service.price)) || 0
     const cartItem = {
       id: service.id,
       name: service.name,
-      price: `$${service.price}`,
+      price,
       image: service.image_url,
+      store_id: service.store_id,
+      category: service.category || "",
       quantity: 1,
-      type: "service",
-      vendor: service.stores?.vendors?.vendor_name || service.stores?.name || "Unknown Vendor"
+      type: "service" as const,
+      location: service.location
     }
     const existingCart = JSON.parse(localStorage.getItem("cart") || "[]")
     const existingItemIndex = existingCart.findIndex((item: any) => item.id === service.id && item.type === "service")
-    
     if (existingItemIndex >= 0) {
       existingCart[existingItemIndex].quantity += 1
     } else {
       existingCart.push(cartItem)
     }
-    
     localStorage.setItem("cart", JSON.stringify(existingCart))
     window.dispatchEvent(new Event("cartUpdated"))
-    alert(`Added ${service.name} to cart!`)
-  }
-
-  const handleBuyNow = (service: any) => {
-    handleAddToCart(service)
-    router.push("/cart")
-  }
-
-  const handleGiftNow = (service: any) => {
-    handleAddToCart(service)
-    router.push("/send-gift")
+    showToast(`Added "${service.name}" to cart`, "success")
   }
 
   return (
@@ -219,11 +212,11 @@ export default function ServicesPage() {
                         
                         <div className="flex items-center gap-1 mb-2">
                           <div className="flex">
-                            {[...Array(5)].map((_, i) => (
+                            {[1, 2, 3, 4, 5].map((star) => (
                               <Star
-                                key={i}
+                                key={star}
                                 className={`h-3 w-3 ${
-                                  i < Math.floor(service.rating || 0)
+                                  star <= Math.round(Number(service.rating) || 0)
                                     ? "fill-yellow-400 text-yellow-400"
                                     : "fill-gray-200 text-gray-200"
                                 }`}
@@ -231,30 +224,20 @@ export default function ServicesPage() {
                             ))}
                           </div>
                           <span className="text-xs text-gray-600">
-                            ({service.reviews_count || 0})
+                            {Number(service.rating ?? 0).toFixed(1)} ({(service.reviews_count ?? 0)} reviews)
                           </span>
                         </div>
 
-                        {(service.duration || service.location) && (
-                          <div className="space-y-1 mb-3">
-                            {service.duration && (
-                              <div className="flex items-center text-xs text-gray-600">
-                                <Clock className="h-3 w-3 mr-1" />
-                                {service.duration}
-                              </div>
-                            )}
-                            {service.location && (
-                              <div className="flex items-center text-xs text-gray-600">
-                                <MapPin className="h-3 w-3 mr-1" />
-                                {service.location}
-                              </div>
-                            )}
+                        {service.location && (
+                          <div className="flex items-center text-xs text-gray-600 mb-2">
+                            <MapPin className="h-3 w-3 mr-1" />
+                            {service.location}
                           </div>
                         )}
 
                         <div className="flex items-baseline gap-2 mb-3">
                           <span className="text-xl font-bold text-primary">
-                            ${service.price}
+                            ${typeof service.price === 'number' ? service.price.toFixed(2) : service.price}/hr
                           </span>
                           {service.original_price && service.price < service.original_price && (
                             <span className="text-sm text-gray-400 line-through">
@@ -267,31 +250,17 @@ export default function ServicesPage() {
                           {service.category}
                         </Badge>
 
-                        <div className="flex gap-2">
-                          <Button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleAddToCart(service)
-                            }}
-                            size="sm"
-                            variant="outline"
-                            className="flex-1 border-2 border-gray-300 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-400"
-                          >
-                            <ShoppingCart className="h-3 w-3 mr-1" />
-                            Book
-                          </Button>
-                          <Button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleGiftNow(service)
-                            }}
-                            size="sm"
-                            className="flex-1 bg-primary hover:bg-primary/90 text-white"
-                          >
-                            <Gift className="h-3 w-3 mr-1" />
-                            Gift
-                          </Button>
-                        </div>
+                        <Button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleAddToCart(service)
+                          }}
+                          size="sm"
+                          className="w-full border-2 border-primary bg-primary hover:bg-primary/90 text-white"
+                        >
+                          <ShoppingCart className="h-3 w-3 mr-1" />
+                          Add to Cart
+                        </Button>
                       </CardContent>
                     </Card>
                   ))}

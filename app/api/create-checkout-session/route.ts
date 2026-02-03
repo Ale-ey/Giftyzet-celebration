@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { stripe } from '@/lib/stripe/config'
+import { supabase } from '@/lib/supabase/client'
 import Stripe from 'stripe'
 
 export async function POST(req: NextRequest) {
@@ -10,6 +11,15 @@ export async function POST(req: NextRequest) {
     if (!items || !Array.isArray(items) || items.length === 0) {
       return NextResponse.json(
         { error: 'No items provided' },
+        { status: 400 }
+      )
+    }
+
+    const orderIdStr = typeof orderId === 'string' ? orderId.trim() : ''
+    const isValidOrderId = orderIdStr.length === 36 && /^[0-9a-f-]{36}$/i.test(orderIdStr)
+    if (!isValidOrderId) {
+      return NextResponse.json(
+        { error: 'Invalid order' },
         { status: 400 }
       )
     }
@@ -36,7 +46,6 @@ export async function POST(req: NextRequest) {
       }
     })
 
-    // Add shipping as a line item
     const subtotal = items.reduce((sum: number, item: any) => {
       const price = typeof item.price === 'string' 
         ? parseFloat(item.price.replace(/[$₹]/g, ''))
@@ -44,29 +53,25 @@ export async function POST(req: NextRequest) {
       return sum + (isNaN(price) ? 0 : price) * (item.quantity || 1)
     }, 0)
 
-    if (subtotal > 0) {
-      lineItems.push({
-        price_data: {
-          currency: 'usd',
-          product_data: {
-            name: 'Shipping',
-            description: 'Standard shipping',
-          },
-          unit_amount: 999, // $9.99 in cents
-        },
-        quantity: 1,
-      })
-    }
+    // Shipping: free (no shipping line item)
 
-    // Calculate tax (8%)
-    const taxAmount = Math.round(subtotal * 0.08 * 100)
+    // Tax: admin-configured % from platform_settings
+    let taxPercent = 8
+    const { data: settings } = await supabase
+      .from('platform_settings')
+      .select('tax_percent')
+      .eq('id', 'default')
+      .single()
+    if (settings?.tax_percent != null) taxPercent = Number(settings.tax_percent)
+
+    const taxAmount = Math.round((subtotal * taxPercent / 100) * 100)
     if (taxAmount > 0) {
       lineItems.push({
         price_data: {
           currency: 'usd',
           product_data: {
             name: 'Tax',
-            description: 'Sales tax (8%)',
+            description: `Sales tax (${taxPercent}%)`,
           },
           unit_amount: taxAmount,
         },
@@ -81,11 +86,11 @@ export async function POST(req: NextRequest) {
       payment_method_types: ['card'],
       line_items: lineItems,
       mode: 'payment',
-      success_url: `${origin}/order-success?session_id={CHECKOUT_SESSION_ID}&orderId=${orderId}`,
+      success_url: `${origin}/order-success?session_id={CHECKOUT_SESSION_ID}&orderId=${orderIdStr}`,
       cancel_url: `${origin}/checkout?cancelled=true`,
       customer_email: orderData?.senderEmail || undefined,
       metadata: {
-        orderId: orderId || '',
+        orderId: orderIdStr,
         orderType: orderData?.orderType || 'self',
         senderName: orderData?.senderName || '',
         senderEmail: orderData?.senderEmail || '',

@@ -1,12 +1,42 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Gift, Store, PlayCircle, PauseCircle } from "lucide-react";
+import { Gift, Store, PlayCircle } from "lucide-react";
+
+/** Convert Google Drive share link to embed URL, or return original if not Drive. */
+function getVideoEmbedUrl(url: string | null | undefined): string | null {
+  if (!url || !url.trim()) return null;
+  const u = url.trim();
+  const fileIdMatch = u.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/)
+    || u.match(/drive\.google\.com\/open\?id=([a-zA-Z0-9_-]+)/);
+  if (fileIdMatch) {
+    return `https://drive.google.com/file/d/${fileIdMatch[1]}/preview`;
+  }
+  if (u.startsWith("http://") || u.startsWith("https://")) return u;
+  return null;
+}
 
 export default function OverviewPage() {
   const [isGiftingVideoPlaying, setIsGiftingVideoPlaying] = useState(false);
   const [isVendorVideoPlaying, setIsVendorVideoPlaying] = useState(false);
+  const [giftingVideoUrl, setGiftingVideoUrl] = useState<string | null>(null);
+  const [vendorVideoUrl, setVendorVideoUrl] = useState<string | null>(null);
+  const [videosLoading, setVideosLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/overview/videos")
+      .then((res) => res.json())
+      .then((data) => {
+        setGiftingVideoUrl(data.giftingVideoUrl ?? null);
+        setVendorVideoUrl(data.vendorVideoUrl ?? null);
+      })
+      .catch(() => {})
+      .finally(() => setVideosLoading(false));
+  }, []);
+
+  const giftingEmbed = getVideoEmbedUrl(giftingVideoUrl);
+  const vendorEmbed = getVideoEmbedUrl(vendorVideoUrl);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-white to-gray-50">
@@ -37,35 +67,23 @@ export default function OverviewPage() {
             <CardContent className="p-6">
               <div className="space-y-6">
                 {/* Video Player */}
-                <div className="relative aspect-video bg-gray-100 rounded-lg overflow-hidden group">
-                  <video
-                    className="w-full h-full object-cover"
-                    controls
-                    poster="/placeholder-gift-tutorial.jpg"
-                    onPlay={() => setIsGiftingVideoPlaying(true)}
-                    onPause={() => setIsGiftingVideoPlaying(false)}
-                    onEnded={() => setIsGiftingVideoPlaying(false)}
-                  >
-                    <source
-                      src="/videos/how-to-send-gifts.mp4"
-                      type="video/mp4"
+                <div className="relative aspect-video bg-gray-100 rounded-lg overflow-hidden">
+                  {videosLoading ? (
+                    <div className="absolute inset-0 flex items-center justify-center text-gray-500">
+                      Loading...
+                    </div>
+                  ) : giftingEmbed ? (
+                    <iframe
+                      src={giftingEmbed}
+                      title="How to Send Gifts"
+                      className="w-full h-full border-0"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
                     />
-                    Your browser does not support the video tag.
-                  </video>
-
-                  {/* Play/Pause Overlay */}
-                  {!isGiftingVideoPlaying && (
-                    <div
-                      className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/30 transition-colors cursor-pointer"
-                      onClick={(e) => {
-                        const video = e.currentTarget
-                          .previousElementSibling as HTMLVideoElement;
-                        if (video) {
-                          video.play();
-                        }
-                      }}
-                    >
-                      <PlayCircle className="h-20 w-20 text-white opacity-90 group-hover:opacity-100 transition-opacity" />
+                  ) : (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-500 p-4 text-center">
+                      <PlayCircle className="h-16 w-16 mb-2 opacity-50" />
+                      <p className="text-sm">No video set. Admin can add a Google Drive link in Dashboard.</p>
                     </div>
                   )}
                 </div>
@@ -127,35 +145,23 @@ export default function OverviewPage() {
             <CardContent className="p-6">
               <div className="space-y-6">
                 {/* Video Player */}
-                <div className="relative aspect-video bg-gray-100 rounded-lg overflow-hidden group">
-                  <video
-                    className="w-full h-full object-cover"
-                    controls
-                    poster="/placeholder-vendor-tutorial.jpg"
-                    onPlay={() => setIsVendorVideoPlaying(true)}
-                    onPause={() => setIsVendorVideoPlaying(false)}
-                    onEnded={() => setIsVendorVideoPlaying(false)}
-                  >
-                    <source
-                      src="/videos/how-to-register-as-vendor.mp4"
-                      type="video/mp4"
+                <div className="relative aspect-video bg-gray-100 rounded-lg overflow-hidden">
+                  {videosLoading ? (
+                    <div className="absolute inset-0 flex items-center justify-center text-gray-500">
+                      Loading...
+                    </div>
+                  ) : vendorEmbed ? (
+                    <iframe
+                      src={vendorEmbed}
+                      title="How to Register as Vendor"
+                      className="w-full h-full border-0"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
                     />
-                    Your browser does not support the video tag.
-                  </video>
-
-                  {/* Play/Pause Overlay */}
-                  {!isVendorVideoPlaying && (
-                    <div
-                      className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/30 transition-colors cursor-pointer"
-                      onClick={(e) => {
-                        const video = e.currentTarget
-                          .previousElementSibling as HTMLVideoElement;
-                        if (video) {
-                          video.play();
-                        }
-                      }}
-                    >
-                      <PlayCircle className="h-20 w-20 text-white opacity-90 group-hover:opacity-100 transition-opacity" />
+                  ) : (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-500 p-4 text-center">
+                      <PlayCircle className="h-16 w-16 mb-2 opacity-50" />
+                      <p className="text-sm">No video set. Admin can add a Google Drive link in Dashboard.</p>
                     </div>
                   )}
                 </div>

@@ -267,7 +267,7 @@ export default function OrderDetailModal({ isOpen, onClose, order, onStatusUpdat
           <div>
             <h3 className="text-lg font-semibold text-gray-900 mb-3">Order Items</h3>
             <div className="space-y-3">
-              {order.items.map((item, idx) => (
+              {order.items.map((item: any, idx: number) => (
                 <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                   <div className="flex items-center gap-3">
                     {item.image && (
@@ -280,7 +280,8 @@ export default function OrderDetailModal({ isOpen, onClose, order, onStatusUpdat
                     <div>
                       <p className="font-medium text-gray-900">{item.name}</p>
                       <p className="text-sm text-gray-600">
-                        {item.type === "product" ? "Product" : "Service"} • Qty: {item.quantity}
+                        {item.type === "product" ? "Product" : "Service"}
+                        {item.isService ? ` • ${item.hours ?? item.quantity} hour(s)` : ` • Qty: ${item.quantity}`}
                       </p>
                     </div>
                   </div>
@@ -296,9 +297,32 @@ export default function OrderDetailModal({ isOpen, onClose, order, onStatusUpdat
             <span className="text-2xl font-bold text-primary">${order.total.toFixed(2)}</span>
           </div>
 
-          {/* Action Buttons */}
+          {/* Status dropdown + Action Buttons */}
           {onStatusUpdate && (
             <div className="space-y-3 pt-4 border-t border-gray-200">
+              <div className="flex items-center gap-2 flex-wrap">
+                <label htmlFor="order-status" className="text-sm font-medium text-gray-700">Update status:</label>
+                <select
+                  id="order-status"
+                  value={order.status}
+                  onChange={(e) => {
+                    const newStatus = e.target.value as Order["status"]
+                    if (order.orderType === "gift" && !order.receiverAddress && (newStatus === "confirmed" || newStatus === "dispatched")) {
+                      alert("Cannot confirm or dispatch: Receiver address is required for gift orders.")
+                      return
+                    }
+                    onStatusUpdate(order.id, newStatus)
+                    onClose()
+                  }}
+                  className="rounded border border-gray-200 bg-white px-3 py-2 text-gray-900 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                >
+                  <option value="pending">Pending</option>
+                  <option value="confirmed">Confirmed</option>
+                  <option value="dispatched">Dispatched</option>
+                  <option value="delivered">Delivered</option>
+                  <option value="cancelled">Cancelled</option>
+                </select>
+              </div>
               {/* Confirm Order Button */}
               {order.status === "pending" && (
                 <>

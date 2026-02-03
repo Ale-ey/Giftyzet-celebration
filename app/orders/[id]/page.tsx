@@ -2,27 +2,48 @@
 
 import { useState, useEffect } from "react"
 import { useRouter, useParams } from "next/navigation"
-import { ArrowLeft, Package, CheckCircle, Truck, MapPin, Phone, Mail, User, Calendar } from "lucide-react"
+import { ArrowLeft, Package, CheckCircle, Truck, MapPin, Phone, Mail, User, Calendar, Star } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { getOrderById } from "@/lib/api/orders"
+import { getCurrentUser } from "@/lib/api/auth"
+import { createReview, getReviewsForOrder } from "@/lib/api/reviews"
+import { useToast } from "@/components/ui/toast"
 
 export default function ViewOrderPage() {
   const router = useRouter()
   const params = useParams()
+  const { showToast } = useToast()
   const orderId = params.id as string
 
   const [order, setOrder] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+  const [existingReviews, setExistingReviews] = useState<Record<string, { rating: number; comment: string | null }>>({})
+  const [reviewForm, setReviewForm] = useState<Record<string, { rating: number; comment: string }>>({})
+  const [submittingReview, setSubmittingReview] = useState<string | null>(null)
 
   useEffect(() => {
     async function loadOrder() {
       try {
         setLoading(true)
-        const data = await getOrderById(orderId)
+        const [data, user] = await Promise.all([
+          getOrderById(orderId),
+          getCurrentUser().catch(() => null)
+        ])
         setOrder(data)
+        setCurrentUserId(user?.id ?? null)
+        if (data?.status === "delivered" && user?.id) {
+          const reviews = await getReviewsForOrder(orderId)
+          const byKey: Record<string, { rating: number; comment: string | null }> = {}
+          reviews.forEach((r: any) => {
+            const key = r.product_id || r.service_id
+            if (key) byKey[key] = { rating: r.rating, comment: r.comment }
+          })
+          setExistingReviews(byKey)
+        }
       } catch (err: any) {
         console.error('Error loading order:', err)
         setError(err.message || 'Failed to load order')
@@ -129,31 +150,118 @@ export default function ViewOrderPage() {
                   Order Items
                 </h2>
                 <div className="space-y-4">
-                  {order.order_items?.map((item: any, idx: number) => (
-                    <div key={idx} className="flex gap-4 p-4 border border-gray-200 rounded-lg">
-                      <div className="relative w-20 h-20 rounded-lg overflow-hidden border border-gray-200 flex-shrink-0 bg-gray-50">
-                        {item.image_url ? (
-                          <img
-                            src={item.image_url}
-                            alt={item.name}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <Package className="h-8 w-8 text-gray-300" />
+                  {order.order_items?.map((item: any, idx: number) => {
+                    const qty = item.quantity ?? 1
+                    const unitPrice = parseFloat(item.price) || 0
+                    const lineTotal = unitPrice * qty
+                    const isService = item.item_type === "service"
+                    const itemKey = item.product_id || item.service_id
+                    const existing = itemKey ? existingReviews[itemKey] : null
+                    const canReview = order.status === "delivered" && currentUserId === order.user_id && itemKey && !existing
+                    const form = reviewForm[itemKey]
+                    return (
+                      <div key={idx} className="flex flex-col gap-3 p-4 border border-gray-200 rounded-lg">
+                        <div className="flex gap-4">
+                          <div className="relative w-20 h-20 rounded-lg overflow-hidden border border-gray-200 flex-shrink-0 bg-gray-50">
+                            {item.image_url ? (
+                              <img
+                                src={item.image_url}
+                                alt={item.name}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center">
+                                <Package className="h-8 w-8 text-gray-300" />
+                              </div>
+                            )}
                           </div>
-                        )}
-                      </div>
-                      <div className="flex-1">
-                        <h3 className="font-semibold text-gray-900">{item.name}</h3>
-                        <p className="text-sm text-gray-600 capitalize">{item.item_type}</p>
-                        <div className="flex items-center justify-between mt-2">
-                          <span className="text-sm text-gray-600">Qty: {item.quantity}</span>
-                          <span className="font-semibold text-gray-900">${parseFloat(item.price).toFixed(2)}</span>
+                          <div className="flex-1">
+                            <h3 className="font-semibold text-gray-900">{item.name}</h3>
+                            <p className="text-sm text-gray-600 capitalize">{item.item_type}</p>
+                            <div className="flex items-center justify-between mt-2">
+                              <span className="text-sm text-gray-600">
+                                {isService ? `${qty} hour(s)` : `Qty: ${qty}`}
+                              </span>
+                              <span className="font-semibold text-gray-900">${lineTotal.toFixed(2)}</span>
+                            </div>
+                            {existing && (
+                              <div className="mt-2 flex items-center gap-2 text-sm text-gray-600">
+                                <span className="flex items-center gap-0.5">
+                                  {Array.from({ length: 5 }).map((_, i) => (
+                                    <Star key={i} className={`h-4 w-4 ${i < existing.rating ? "text-yellow-500 fill-yellow-500" : "text-gray-300"}`} />
+                                  ))}
+                                </span>
+                                {existing.comment && <span className="text-gray-500">— {existing.comment}</span>}
+                              </div>
+                            )}
+                            {canReview && (
+                              <div className="mt-3 pt-3 border-t border-gray-100 space-y-2">
+                                <p className="text-sm font-medium text-gray-700">Leave a review</p>
+                                <div className="flex items-center gap-1">
+                                  {[1, 2, 3, 4, 5].map((star) => (
+                                    <button
+                                      key={star}
+                                      type="button"
+                                      onClick={() => setReviewForm((prev) => ({ ...prev, [itemKey]: { rating: star, comment: prev[itemKey]?.comment ?? "" } }))}
+                                      className="p-0.5 focus:outline-none"
+                                    >
+                                      <Star className={`h-6 w-6 ${(form?.rating ?? 0) >= star ? "text-yellow-500 fill-yellow-500" : "text-gray-300"}`} />
+                                    </button>
+                                  ))}
+                                </div>
+                                <textarea
+                                  placeholder="Your message (optional)"
+                                  value={form?.comment ?? ""}
+                                  onChange={(e) => setReviewForm((prev) => ({ ...prev, [itemKey]: { rating: prev[itemKey]?.rating ?? 0, comment: e.target.value } }))}
+                                  className="max-w-md min-h-[80px] w-full rounded-md border border-gray-200 px-3 py-2 text-sm text-gray-900 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                                  rows={3}
+                                />
+                                <Button
+                                  size="sm"
+                                  disabled={submittingReview === itemKey}
+                                  onClick={async () => {
+                                    if (!currentUserId) {
+                                      showToast("Please sign in to leave a review", "error")
+                                      return
+                                    }
+                                    if (!form?.rating) {
+                                      showToast("Please select a star rating", "error")
+                                      return
+                                    }
+                                    setSubmittingReview(itemKey)
+                                    try {
+                                      await createReview(currentUserId, {
+                                        order_id: orderId,
+                                        product_id: item.product_id || undefined,
+                                        service_id: item.service_id || undefined,
+                                        rating: form.rating,
+                                        comment: form.comment || undefined
+                                      })
+                                      setExistingReviews((prev) => ({ ...prev, [itemKey]: { rating: form.rating, comment: form.comment || null } }))
+                                      setReviewForm((prev) => {
+                                        const next = { ...prev }
+                                        delete next[itemKey]
+                                        return next
+                                      })
+                                      showToast("Thank you for your review!", "success")
+                                    } catch (err: unknown) {
+                                      const message = err instanceof Error ? err.message : (err && typeof err === "object" && "message" in err ? String((err as { message: unknown }).message) : "Failed to submit review")
+                                      showToast(message || "Failed to submit review", "error")
+                                      console.error("Submit review error:", err)
+                                    } finally {
+                                      setSubmittingReview(null)
+                                    }
+                                  }}
+                                >
+                                  {submittingReview === itemKey ? "Submitting..." : "Submit review"}
+                                </Button>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               </CardContent>
             </Card>
@@ -170,7 +278,7 @@ export default function ViewOrderPage() {
                 <div className="mb-4">
                   <Badge className={order.order_type === 'gift' 
                     ? 'bg-primary/10 text-primary border-primary/20 text-base px-3 py-1' 
-                    : 'bg-gray-100 text-gray-700 border-gray-200 text-base px-3 py-1'
+                    : 'bg-gray-800 text-white border-gray-800 text-base px-3 py-1'
                   }>
                     {order.order_type === 'gift' ? '🎁 Gift Order' : '📦 Self Order'}
                   </Badge>
@@ -308,7 +416,14 @@ export default function ViewOrderPage() {
                 <div className="space-y-3 mb-4">
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Order Type</span>
-                    <Badge variant="outline" className="capitalize">
+                    <Badge
+                      variant="outline"
+                      className={
+                        order.order_type === "self"
+                          ? "bg-gray-800 text-white border-gray-800 capitalize"
+                          : "capitalize"
+                      }
+                    >
                       {order.order_type}
                     </Badge>
                   </div>

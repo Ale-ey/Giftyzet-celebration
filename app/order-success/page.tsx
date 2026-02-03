@@ -3,10 +3,11 @@
 import { Suspense } from "react"
 import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { CheckCircle, Copy, Gift, Package, Loader2 } from "lucide-react"
+import { CheckCircle, Copy, Gift, Mail, Package, Loader2, Smartphone } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { useToast } from "@/components/ui/toast"
+import { getOrderById } from "@/lib/api/orders"
 
 function OrderSuccessContent() {
   const router = useRouter()
@@ -22,27 +23,46 @@ function OrderSuccessContent() {
   const [paymentVerified, setPaymentVerified] = useState(false)
   const [giftLinkDelivery, setGiftLinkDelivery] = useState<any>(null)
   const [sendingGiftLink, setSendingGiftLink] = useState(false)
+  const [orderReceiver, setOrderReceiver] = useState<{ name?: string; email?: string; phone?: string } | null>(null)
+  const [sentByEmail, setSentByEmail] = useState(false)
+  const [sentBySms, setSentBySms] = useState(false)
 
   useEffect(() => {
     if (token && type === "gift") {
       const link = `${window.location.origin}/gift-receiver/${token}`
       setGiftLink(link)
     }
-    
-    // Load gift link delivery info from localStorage
     const deliveryInfo = localStorage.getItem("giftLinkDelivery")
     if (deliveryInfo) {
       try {
         const parsed = JSON.parse(deliveryInfo)
         setGiftLinkDelivery(parsed)
-        if (parsed.giftLink) {
-          setGiftLink(parsed.giftLink)
-        }
+        if (parsed.giftLink) setGiftLink(parsed.giftLink)
       } catch (e) {
         console.error("Error parsing gift link delivery info:", e)
       }
     }
   }, [token, type])
+
+  useEffect(() => {
+    if (type !== "gift" || !orderId || giftLink) return
+    let cancelled = false
+    getOrderById(orderId)
+      .then((order: any) => {
+        if (cancelled) return
+        if (order?.gift_link) setGiftLink(order.gift_link)
+        else if (order?.gift_token)
+          setGiftLink(`${typeof window !== "undefined" ? window.location.origin : ""}/gift-receiver/${order.gift_token}`)
+        if (order?.receiver_name || order?.receiver_email || order?.receiver_phone)
+          setOrderReceiver({
+            name: order.receiver_name,
+            email: order.receiver_email,
+            phone: order.receiver_phone,
+          })
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [type, orderId, giftLink])
 
   useEffect(() => {
     async function verifyPayment() {
@@ -94,16 +114,18 @@ function OrderSuccessContent() {
     }
   }
 
+  const receiverName = giftLinkDelivery?.receiverName ?? orderReceiver?.name ?? "Recipient"
+  const receiverEmail = giftLinkDelivery?.receiverEmail ?? orderReceiver?.email
+  const receiverPhone = giftLinkDelivery?.receiverPhone ?? orderReceiver?.phone
+  const senderName = giftLinkDelivery?.senderName ?? "Sender"
+
   const sendGiftLink = async () => {
     if (!giftLinkDelivery || sendingGiftLink) return
-    
     setSendingGiftLink(true)
     try {
       const response = await fetch('/api/send-gift-link', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           method: giftLinkDelivery.method,
           receiverName: giftLinkDelivery.receiverName,
@@ -113,17 +135,15 @@ function OrderSuccessContent() {
           giftLink: giftLinkDelivery.giftLink,
         }),
       })
-
       const data = await response.json()
-
       if (data.success) {
         if (giftLinkDelivery.method === 'email') {
+          setSentByEmail(true)
           showToast("Gift link sent via email successfully!", "success")
         } else if (giftLinkDelivery.method === 'sms') {
+          setSentBySms(true)
           showToast("Gift link sent via SMS successfully!", "success")
         }
-        
-        // Clear the delivery info from localStorage after successful send
         localStorage.removeItem("giftLinkDelivery")
       } else {
         showToast(`Failed to send gift link: ${data.error}`, "error")
@@ -131,6 +151,45 @@ function OrderSuccessContent() {
     } catch (error: any) {
       console.error('Error sending gift link:', error)
       showToast("Failed to send gift link. You can copy it below.", "error")
+    } finally {
+      setSendingGiftLink(false)
+    }
+  }
+
+  const sendGiftLinkWithMethod = async (method: "email" | "sms") => {
+    if (!giftLink || sendingGiftLink) return
+    if (method === "email" && !receiverEmail) {
+      showToast("Recipient email not found. Use Copy Link to share manually.", "error")
+      return
+    }
+    if (method === "sms" && !receiverPhone) {
+      showToast("Recipient phone not found. Use Copy Link to share manually.", "error")
+      return
+    }
+    setSendingGiftLink(true)
+    try {
+      const response = await fetch('/api/send-gift-link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          method,
+          receiverName,
+          receiverEmail: method === "email" ? receiverEmail : undefined,
+          receiverPhone: method === "sms" ? receiverPhone : undefined,
+          senderName,
+          giftLink,
+        }),
+      })
+      const data = await response.json()
+      if (data.success) {
+        if (method === "email") setSentByEmail(true)
+        else setSentBySms(true)
+        showToast(method === "email" ? "Gift link sent via email!" : "Gift link sent via SMS!", "success")
+      } else {
+        showToast(data.error || "Failed to send", "error")
+      }
+    } catch (error: any) {
+      showToast("Failed to send. Use Copy Link to share.", "error")
     } finally {
       setSendingGiftLink(false)
     }
@@ -193,98 +252,87 @@ function OrderSuccessContent() {
 
           {type === "gift" && giftLink && (
             <>
-              {/* Payment Confirmed for Gift Orders */}
               {paymentVerified && (
                 <div className="mb-4 inline-flex items-center gap-2 px-4 py-2 bg-green-50 border-2 border-green-500 rounded-lg">
                   <CheckCircle className="h-5 w-5 text-green-600" />
                   <span className="font-semibold text-green-700">Payment Confirmed</span>
                 </div>
               )}
-              
-              {/* Delivery Method Status */}
-              {giftLinkDelivery && (
-                <div className="mb-4">
-                  {giftLinkDelivery.method === 'email' && (
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-center">
-                      <p className="text-sm text-blue-800">
-                        {sendingGiftLink ? (
-                          <>
-                            <Loader2 className="inline h-4 w-4 mr-2 animate-spin" />
-                            Sending gift link via email...
-                          </>
-                        ) : (
-                          <>
-                            📧 Gift link has been sent to <strong>{giftLinkDelivery.receiverEmail}</strong>
-                          </>
-                        )}
-                      </p>
-                    </div>
-                  )}
-                  
-                  {giftLinkDelivery.method === 'sms' && (
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-center">
-                      <p className="text-sm text-blue-800">
-                        {sendingGiftLink ? (
-                          <>
-                            <Loader2 className="inline h-4 w-4 mr-2 animate-spin" />
-                            Sending gift link via SMS...
-                          </>
-                        ) : (
-                          <>
-                            📱 Gift link has been sent via SMS to <strong>{giftLinkDelivery.receiverPhone}</strong>
-                          </>
-                        )}
-                      </p>
-                    </div>
-                  )}
-                  
-                  {giftLinkDelivery.method === 'copy' && (
-                    <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 text-center">
-                      <p className="text-sm text-purple-800">
-                        🔗 Your gift link is ready! Copy it below and share it with <strong>{giftLinkDelivery.receiverName}</strong>
-                      </p>
-                    </div>
-                  )}
+
+              {/* Auto-send status when user had chosen email/SMS before payment */}
+              {giftLinkDelivery && (giftLinkDelivery.method === 'email' || giftLinkDelivery.method === 'sms') && (
+                <div className="mb-4 bg-blue-50 border border-blue-200 rounded-lg p-3 text-center">
+                  <p className="text-sm text-blue-800">
+                    {sendingGiftLink ? (
+                      <><Loader2 className="inline h-4 w-4 mr-2 animate-spin" /> Sending...</>
+                    ) : giftLinkDelivery.method === 'email' ? (
+                      <>📧 Gift link sent to <strong>{giftLinkDelivery.receiverEmail}</strong></>
+                    ) : (
+                      <>📱 Gift link sent via SMS to <strong>{giftLinkDelivery.receiverPhone}</strong></>
+                    )}
+                  </p>
                 </div>
               )}
-              
-              {/* Gift Link Section */}
-              <div className={`border-2 rounded-lg p-4 mb-6 ${
-                giftLinkDelivery?.method === 'copy' 
-                  ? 'bg-purple-50 border-purple-400' 
-                  : 'bg-yellow-50 border-yellow-400'
-              }`}>
-                <div className="flex items-start gap-3 mb-3">
-                  <Gift className={`h-5 w-5 mt-0.5 flex-shrink-0 ${
-                    giftLinkDelivery?.method === 'copy' ? 'text-purple-700' : 'text-yellow-700'
-                  }`} />
+
+              <div className="border-2 rounded-lg p-4 mb-6 bg-gray-50 border-gray-200">
+                <div className="flex items-start gap-3 mb-4">
+                  <Gift className="h-5 w-5 mt-0.5 shrink-0 text-primary" />
                   <div className="text-left flex-1">
-                    <h3 className="font-semibold text-gray-900 mb-1">
-                      {giftLinkDelivery?.method === 'copy' ? 'Copy & Share Gift Link' : 'Gift Link (Backup)'}
-                    </h3>
-                    <p className="text-sm text-gray-700 mb-3">
-                      {giftLinkDelivery?.method === 'copy' 
-                        ? 'Share this link with the receiver so they can confirm their shipping address.'
-                        : 'Your order cannot be dispatched until the receiver confirms their shipping address. You can also share this link as a backup.'}
+                    <h3 className="font-semibold text-gray-900 mb-1">Share the gift link with the recipient</h3>
+                    <p className="text-sm text-gray-700">
+                      The recipient will open the link and enter their address and contact details so we can ship the gift.
                     </p>
                   </div>
                 </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+                  <Button
+                    variant="outline"
+                    className="h-auto py-3 flex flex-col items-center gap-1 border-2 bg-white hover:bg-blue-50 hover:border-blue-300"
+                    onClick={() => sendGiftLinkWithMethod("email")}
+                    disabled={sendingGiftLink || sentByEmail || !receiverEmail}
+                  >
+                    <Mail className="h-5 w-5" />
+                    <span>{sentByEmail ? "Sent by email" : "Send by email"}</span>
+                    {receiverEmail && !sentByEmail && (
+                      <span className="text-xs text-gray-500 font-normal truncate max-w-full">{receiverEmail}</span>
+                    )}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="h-auto py-3 flex flex-col items-center gap-1 border-2 bg-white hover:bg-green-50 hover:border-green-300"
+                    onClick={() => sendGiftLinkWithMethod("sms")}
+                    disabled={sendingGiftLink || sentBySms || !receiverPhone}
+                  >
+                    <Smartphone className="h-5 w-5" />
+                    <span>{sentBySms ? "Sent by SMS" : "Send by SMS"}</span>
+                    {receiverPhone && !sentBySms && (
+                      <span className="text-xs text-gray-500 font-normal truncate max-w-full">{receiverPhone}</span>
+                    )}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="h-auto py-3 flex flex-col items-center gap-1 border-2 bg-white hover:bg-purple-50 hover:border-purple-300"
+                    onClick={handleCopyLink}
+                    disabled={!giftLink}
+                  >
+                    <Copy className="h-5 w-5" />
+                    <span>{copied ? "Copied!" : "Copy link"}</span>
+                  </Button>
+                </div>
+
                 <div className="bg-white p-3 rounded border border-gray-300">
-                  <div className="flex items-center justify-between gap-2 mb-2">
-                    <p className="text-sm font-semibold text-gray-900">Gift Receiver Link:</p>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleCopyLink}
-                      className="border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
-                    >
-                      <Copy className="h-4 w-4 mr-1" />
-                      {copied ? "Copied!" : "Copy Link"}
-                    </Button>
-                  </div>
-                  <p className="text-xs text-gray-600 break-all text-left font-mono bg-gray-50 p-2 rounded">
-                    {giftLink}
-                  </p>
+                  <p className="text-sm font-semibold text-gray-900 mb-2">Gift receiver link:</p>
+                  <p className="text-xs text-gray-600 break-all font-mono bg-gray-50 p-2 rounded mb-2">{giftLink}</p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleCopyLink}
+                    className="border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+                  >
+                    <Copy className="h-4 w-4 mr-1" />
+                    {copied ? "Copied!" : "Copy link"}
+                  </Button>
                 </div>
               </div>
             </>

@@ -16,6 +16,9 @@ export default function GiftReceiverPage() {
   const { showToast } = useToast()
 
   const [order, setOrder] = useState<any>(null)
+  const [receiverName, setReceiverName] = useState("")
+  const [receiverEmail, setReceiverEmail] = useState("")
+  const [receiverPhone, setReceiverPhone] = useState("")
   const [receiverAddress, setReceiverAddress] = useState("")
   const [loading, setLoading] = useState(false)
   const [submitted, setSubmitted] = useState(false)
@@ -23,50 +26,64 @@ export default function GiftReceiverPage() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    // Load order data from Supabase using gift token
     const loadOrder = async () => {
       try {
         const orderData = await getOrderByGiftToken(token)
         setOrder(orderData)
-        setReceiverAddress(orderData.receiver_address || "")
+        setReceiverName(String(orderData.receiver_name ?? ""))
+        setReceiverEmail(String(orderData.receiver_email ?? ""))
+        setReceiverPhone(String(orderData.receiver_phone ?? ""))
+        setReceiverAddress(String(orderData.receiver_address ?? ""))
       } catch (e: any) {
         console.error("Error loading gift order:", e)
         setError(e.message || "Gift not found")
       }
     }
-    
-    if (token) {
-      loadOrder()
-    }
+    if (token) loadOrder()
   }, [token])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
     if (!receiverAddress.trim()) {
-      showToast("Please enter your address", "error")
+      showToast("Please enter your delivery address", "error")
+      return
+    }
+    if (!receiverName.trim()) {
+      showToast("Please enter your full name", "error")
+      return
+    }
+    if (!receiverEmail.trim()) {
+      showToast("Please enter your email", "error")
+      return
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(receiverEmail.trim())) {
+      showToast("Please enter a valid email address", "error")
       return
     }
 
     setLoading(true)
-
     try {
-      // Confirm gift receiver address via Supabase API
-      await confirmGiftReceiver(token, receiverAddress.trim())
-      
-      // Update local state
+      await confirmGiftReceiver(token, {
+        receiverAddress: receiverAddress.trim(),
+        receiverName: receiverName.trim(),
+        receiverEmail: receiverEmail.trim(),
+        receiverPhone: receiverPhone.trim() || undefined,
+      })
       setOrder((prev: any) => ({
         ...prev,
+        receiver_name: receiverName.trim(),
+        receiver_email: receiverEmail.trim(),
+        receiver_phone: receiverPhone.trim() || prev.receiver_phone,
         receiver_address: receiverAddress.trim(),
-        status: 'confirmed'
+        status: "confirmed",
       }))
-      
       window.dispatchEvent(new Event("ordersUpdated"))
-      showToast("Address confirmed successfully!", "success")
+      showToast("Your details have been confirmed. Your gift will be delivered soon!", "success")
       setSubmitted(true)
-    } catch (error: any) {
-      console.error("Error submitting receiver address:", error)
-      showToast(error.message || "Failed to submit address. Please try again.", "error")
+    } catch (err: any) {
+      console.error("Error submitting receiver details:", err)
+      showToast(err.message || "Failed to submit. Please try again.", "error")
     } finally {
       setLoading(false)
     }
@@ -135,7 +152,7 @@ export default function GiftReceiverPage() {
             <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Thank You!</h2>
             <p className="text-gray-600 mb-6">
-              Your address has been confirmed. Your gift will be delivered soon!
+              Your address and contact details have been confirmed. Your gift will be delivered soon!
             </p>
             <Button
               onClick={() => router.push("/marketplace")}
@@ -249,47 +266,53 @@ export default function GiftReceiverPage() {
           <CardContent className="p-6">
             <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
               <MapPin className="h-5 w-5 mr-2 text-green-600" />
-              Confirm Your Delivery Address
+              Enter your address and contact details
             </h2>
+            <p className="text-sm text-gray-600 mb-4">
+              Confirm or update your name, email, phone and delivery address so we can ship your gift.
+            </p>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
                 <label htmlFor="receiverName" className="text-sm font-semibold text-gray-900">
-                  Full Name
+                  Full Name *
                 </label>
                 <Input
                   id="receiverName"
-                  value={order.receiver_name || ""}
-                  disabled
-                  className="bg-gray-50 text-gray-600 border-gray-200"
+                  value={receiverName}
+                  onChange={(e) => setReceiverName(e.target.value)}
+                  placeholder="Your full name"
+                  required
+                  className="bg-white border-gray-300 text-gray-900"
                 />
               </div>
               <div className="space-y-2">
                 <label htmlFor="receiverEmail" className="text-sm font-semibold text-gray-900">
-                  Email
+                  Email *
                 </label>
                 <Input
                   id="receiverEmail"
                   type="email"
-                  value={order.receiver_email || ""}
-                  disabled
-                  className="bg-gray-50 text-gray-600 border-gray-200"
+                  value={receiverEmail}
+                  onChange={(e) => setReceiverEmail(e.target.value)}
+                  placeholder="your@email.com"
+                  required
+                  className="bg-white border-gray-300 text-gray-900"
                 />
               </div>
-              {order.receiver_phone && (
-                <div className="space-y-2">
-                  <label htmlFor="receiverPhone" className="text-sm font-semibold text-gray-900 flex items-center">
-                    <Phone className="h-4 w-4 mr-1" />
-                    Phone Number
-                  </label>
-                  <Input
-                    id="receiverPhone"
-                    type="tel"
-                    value={order.receiver_phone}
-                    disabled
-                    className="bg-gray-50 text-gray-600 border-gray-200"
-                  />
-                </div>
-              )}
+              <div className="space-y-2">
+                <label htmlFor="receiverPhone" className="text-sm font-semibold text-gray-900 flex items-center">
+                  <Phone className="h-4 w-4 mr-1" />
+                  Phone Number
+                </label>
+                <Input
+                  id="receiverPhone"
+                  type="tel"
+                  value={receiverPhone}
+                  onChange={(e) => setReceiverPhone(e.target.value)}
+                  placeholder="+1 234 567 8900"
+                  className="bg-white border-gray-300 text-gray-900"
+                />
+              </div>
               <div className="space-y-2">
                 <label htmlFor="receiverAddress" className="text-sm font-semibold text-gray-900 flex items-center">
                   <MapPin className="h-4 w-4 mr-1" />
@@ -302,7 +325,7 @@ export default function GiftReceiverPage() {
                   required
                   rows={4}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-                  placeholder="Enter your complete delivery address&#10;Street, City, State, ZIP Code"
+                  placeholder="Street, City, State, ZIP Code"
                 />
               </div>
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
@@ -313,7 +336,7 @@ export default function GiftReceiverPage() {
               <div className="flex flex-col sm:flex-row gap-3 pt-2">
                 <Button
                   type="submit"
-                  disabled={loading || !receiverAddress.trim()}
+                  disabled={loading || !receiverAddress.trim() || !receiverName.trim() || !receiverEmail.trim()}
                   className="flex-1 bg-green-600 hover:bg-green-700 text-white disabled:bg-gray-300 disabled:cursor-not-allowed"
                 >
                   {loading ? (
@@ -324,7 +347,7 @@ export default function GiftReceiverPage() {
                   ) : (
                     <>
                       <CheckCircle className="h-4 w-4 mr-2" />
-                      Confirm & Accept Gift
+                      Confirm details & accept gift
                     </>
                   )}
                 </Button>

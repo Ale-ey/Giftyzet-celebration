@@ -184,7 +184,12 @@ export default function AuthModal({
       }
     } catch (err: any) {
       console.error("Auth error:", err);
-      setError(err.message || "An error occurred. Please try again.");
+      const is429 = err?.status === 429 || String(err?.message || "").toLowerCase().includes("429") || String(err?.message || "").toLowerCase().includes("rate limit");
+      setError(
+        is429
+          ? "Too many signup attempts. Please wait a few minutes and try again, or try from a different network."
+          : err?.message || "An error occurred. Please try again."
+      );
     } finally {
       setLoading(false);
     }

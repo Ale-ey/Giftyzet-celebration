@@ -98,6 +98,30 @@ export interface ReviewWithUser {
   users: { name: string | null } | null
 }
 
+/** Normalize Supabase relation: users can come back as array or single object. */
+function normalizeReviewWithUser(row: {
+  id: string
+  rating: number
+  comment: string | null
+  created_at: string
+  users?: { name: string | null } | { name: string | null }[] | null
+}): ReviewWithUser {
+  const users = row.users
+  const userObj =
+    users == null
+      ? null
+      : Array.isArray(users)
+        ? users[0] ?? null
+        : users
+  return {
+    id: row.id,
+    rating: row.rating,
+    comment: row.comment,
+    created_at: row.created_at,
+    users: userObj,
+  }
+}
+
 /**
  * Get reviews for a product (for display on product detail page). Includes reviewer name from users.
  */
@@ -109,7 +133,7 @@ export async function getReviewsForProduct(productId: string): Promise<ReviewWit
     .order('created_at', { ascending: false })
 
   if (error) throw error
-  return (data || []) as ReviewWithUser[]
+  return (data || []).map(normalizeReviewWithUser)
 }
 
 /**
@@ -123,5 +147,5 @@ export async function getReviewsForService(serviceId: string): Promise<ReviewWit
     .order('created_at', { ascending: false })
 
   if (error) throw error
-  return (data || []) as ReviewWithUser[]
+  return (data || []).map(normalizeReviewWithUser)
 }

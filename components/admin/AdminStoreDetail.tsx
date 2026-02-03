@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { ArrowLeft, Package, DollarSign, ShoppingBag, Store, Calendar, XCircle, AlertTriangle } from "lucide-react"
+import { ArrowLeft, Package, DollarSign, ShoppingBag, Store, XCircle, AlertTriangle, CheckCircle2, X } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -14,77 +14,136 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { getStores, getOrders, getVendors, saveStore } from "@/lib/vendor-data"
-import { allProducts, allServices } from "@/lib/constants"
-import type { Store as StoreType, Order, Vendor } from "@/types"
+import { useToast } from "@/components/ui/toast"
+import { supabase } from "@/lib/supabase/client"
 
 interface AdminStoreDetailProps {
   storeId: string
 }
 
+type StoreRow = {
+  id: string
+  name: string
+  description: string | null
+  status: string
+  vendor_id: string
+  address: string | null
+  phone: string | null
+  email: string | null
+  category: string | null
+  created_at: string
+  approved_at: string | null
+  suspended_at: string | null
+  vendors?: { id: string; vendor_name: string; email: string | null } | null
+}
+
+type OrderRow = {
+  id: string
+  order_number: string
+  total: number
+  status: string
+  created_at: string
+  sender_name?: string
+}
+
 export default function AdminStoreDetail({ storeId }: AdminStoreDetailProps) {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
-  const [store, setStore] = useState<StoreType | null>(null)
-  const [vendor, setVendor] = useState<Vendor | null>(null)
-  const [orders, setOrders] = useState<Order[]>([])
+  const [store, setStore] = useState<StoreRow | null>(null)
   const [productCount, setProductCount] = useState(0)
   const [serviceCount, setServiceCount] = useState(0)
+  const [orders, setOrders] = useState<OrderRow[]>([])
   const [totalEarnings, setTotalEarnings] = useState(0)
-  const [totalOrders, setTotalOrders] = useState(0)
   const [showConfirmModal, setShowConfirmModal] = useState(false)
+  const [showRejectModal, setShowRejectModal] = useState(false)
+  const [actionLoading, setActionLoading] = useState(false)
+  const { showToast } = useToast()
 
   useEffect(() => {
-    if (typeof window === "undefined") return
+    let cancelled = false
 
-    const stores = getStores()
-    const foundStore = stores.find((s) => s.id === storeId)
-    
-    if (!foundStore) {
-      router.push("/admin")
-      return
+    async function load() {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        const token = session?.access_token
+        if (!token) {
+          if (!cancelled) router.push("/admin")
+          return
+        }
+        const res = await fetch(`/api/admin/stores/${encodeURIComponent(storeId)}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        if (cancelled) return
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}))
+          if (res.status === 401 || res.status === 404) {
+            router.push("/admin")
+            return
+          }
+          throw new Error(err.error ?? "Failed to load store")
+        }
+        const json = await res.json()
+        if (cancelled) return
+        if (!json.store) {
+          router.push("/admin")
+          return
+        }
+        setStore(json.store as StoreRow)
+        setProductCount(json.productCount ?? 0)
+        setServiceCount(json.serviceCount ?? 0)
+        setOrders((json.orders ?? []) as OrderRow[])
+        setTotalEarnings(Number(json.totalEarnings ?? 0))
+      } catch {
+        if (!cancelled) router.push("/admin")
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
     }
 
-    setStore(foundStore)
-
-    // Get vendor info
-    const vendors = getVendors()
-    const foundVendor = vendors.find((v) => v.id === foundStore.vendorId)
-    setVendor(foundVendor || null)
-
-    // Get orders for this vendor
-    const allOrders = getOrders()
-    const vendorOrders = allOrders.filter((o) => o.vendorId === foundStore.vendorId)
-    setOrders(vendorOrders)
-    setTotalOrders(vendorOrders.length)
-
-    // Calculate total earnings
-    const earnings = vendorOrders.reduce((sum, order) => sum + order.total, 0)
-    setTotalEarnings(earnings)
-
-    // Count products and services
-    if (foundVendor) {
-      const products = allProducts.filter((p) => p.vendor === foundVendor.vendorName)
-      const services = allServices.filter((s) => s.vendor === foundVendor.vendorName)
-      setProductCount(products.length)
-      setServiceCount(services.length)
-    }
-
-    setLoading(false)
+    load()
+    return () => { cancelled = true }
   }, [storeId, router])
 
-  const handleSuspendStore = () => {
-    if (!store) return
-    
-    const updatedStore: StoreType = {
-      ...store,
-      status: store.status === "suspended" ? "approved" : "suspended",
-      suspendedAt: store.status === "suspended" ? undefined : new Date().toISOString()
+  const getAuthHeaders = async () => {
+    const { data: { session } } = await supabase.auth.getSession()
+    return {
+      "Content-Type": "application/json",
+      ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
     }
-    saveStore(updatedStore)
-    setStore(updatedStore)
-    setShowConfirmModal(false)
-    window.dispatchEvent(new Event("storesUpdated"))
+  }
+
+  const handleSuspendStore = async () => {
+    if (!store) return
+    setActionLoading(true)
+    try {
+      const headers = await getAuthHeaders()
+      const res = await fetch(`/api/admin/stores/${encodeURIComponent(store.id)}/suspend`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ unsuspend: store.status === "suspended" }),
+      })
+      const data = await res.json().catch(() => ({}))
+      setShowConfirmModal(false)
+      if (!res.ok) {
+        showToast(data.error ?? "Failed to update store.", "error")
+        return
+      }
+      showToast(store.status === "suspended" ? "Store reactivated." : "Store suspended.", "success")
+      setStore((s) =>
+        s
+          ? {
+              ...s,
+              status: s.status === "suspended" ? "approved" : "suspended",
+              suspended_at: s.status === "suspended" ? null : new Date().toISOString(),
+            }
+          : null
+      )
+    } catch (e) {
+      console.error(e)
+      showToast("Failed to update store. Please try again.", "error")
+    } finally {
+      setActionLoading(false)
+    }
   }
 
   if (loading) {
@@ -99,6 +158,7 @@ export default function AdminStoreDetail({ storeId }: AdminStoreDetailProps) {
     return null
   }
 
+  const vendor = store.vendors
   const pendingOrders = orders.filter((o) => o.status === "pending").length
   const confirmedOrders = orders.filter((o) => o.status === "confirmed").length
   const dispatchedOrders = orders.filter((o) => o.status === "dispatched").length
@@ -116,31 +176,74 @@ export default function AdminStoreDetail({ storeId }: AdminStoreDetailProps) {
           Back to Admin Dashboard
         </Button>
 
-        {/* Store Header */}
         <div className="mb-8">
           <div className="flex items-start justify-between mb-4">
             <div>
               <h1 className="text-3xl font-bold text-gray-900 mb-2">{store.name}</h1>
               {vendor && (
-                <p className="text-gray-600">Vendor: {vendor.name} ({vendor.email})</p>
+                <p className="text-gray-600">Vendor: {vendor.vendor_name} {vendor.email && `(${vendor.email})`}</p>
               )}
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 flex-wrap">
               <Badge
                 className={
                   store.status === "approved"
                     ? "bg-green-50 text-green-700 border-green-200"
                     : store.status === "pending"
                     ? "bg-yellow-50 text-yellow-700 border-yellow-200"
+                    : store.status === "rejected"
+                    ? "bg-red-50 text-red-700 border-red-200"
                     : "bg-red-50 text-red-700 border-red-200"
                 }
               >
                 {store.status.charAt(0).toUpperCase() + store.status.slice(1)}
               </Badge>
-              {store.status !== "pending" && (
+              {store.status === "pending" && (
+                <>
+                  <Button
+                    size="sm"
+                    onClick={async () => {
+                      setActionLoading(true)
+                      try {
+                        const headers = await getAuthHeaders()
+                        const res = await fetch(`/api/admin/stores/${encodeURIComponent(store.id)}/approve`, { method: "POST", headers })
+                        const data = await res.json().catch(() => ({}))
+                        if (!res.ok) {
+                          showToast(data.error ?? "Failed to approve store.", "error")
+                          return
+                        }
+                        showToast("Store approved.", "success")
+                        setStore((s) => (s ? { ...s, status: "approved", approved_at: new Date().toISOString() } : null))
+                      } catch (e) {
+                        console.error(e)
+                        showToast("Failed to approve store. Please try again.", "error")
+                      } finally {
+                        setActionLoading(false)
+                      }
+                    }}
+                    disabled={actionLoading}
+                    className="bg-green-600 hover:bg-green-700 text-white"
+                  >
+                    <CheckCircle2 className="h-3.5 w-3 mr-1" />
+                    {actionLoading ? "..." : "Approve"}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowRejectModal(true)}
+                    disabled={actionLoading}
+                    className="border-gray-200 bg-gray-50 text-gray-600 hover:bg-gray-100"
+                  >
+                    <X className="h-3.5 w-3 mr-1" />
+                    Reject
+                  </Button>
+                </>
+              )}
+              {store.status !== "pending" && store.status !== "rejected" && (
                 <Button
                   onClick={() => setShowConfirmModal(true)}
                   variant="outline"
+                  disabled={actionLoading}
                   className={
                     store.status === "suspended"
                       ? "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
@@ -153,105 +256,63 @@ export default function AdminStoreDetail({ storeId }: AdminStoreDetailProps) {
               )}
             </div>
           </div>
-          {store.description && (
-            <p className="text-gray-600 mb-4">{store.description}</p>
-          )}
+          {store.description && <p className="text-gray-600 mb-4">{store.description}</p>}
           <div className="flex flex-wrap gap-4 text-sm text-gray-600">
-            {store.category && (
-              <span>
-                <strong>Category:</strong> {store.category}
-              </span>
-            )}
-            {store.address && (
-              <span>
-                <strong>Address:</strong> {store.address}
-              </span>
-            )}
-            {store.phone && (
-              <span>
-                <strong>Phone:</strong> {store.phone}
-              </span>
-            )}
-            {store.email && (
-              <span>
-                <strong>Email:</strong> {store.email}
-              </span>
-            )}
-            {store.createdAt && (
-              <span>
-                <strong>Created:</strong> {new Date(store.createdAt).toLocaleDateString()}
-              </span>
-            )}
-            {store.approvedAt && (
-              <span>
-                <strong>Approved:</strong> {new Date(store.approvedAt).toLocaleDateString()}
-              </span>
-            )}
+            {store.category && <span><strong>Category:</strong> {store.category}</span>}
+            {store.address && <span><strong>Address:</strong> {store.address}</span>}
+            {store.phone && <span><strong>Phone:</strong> {store.phone}</span>}
+            {store.email && <span><strong>Email:</strong> {store.email}</span>}
+            {store.created_at && <span><strong>Created:</strong> {new Date(store.created_at).toLocaleDateString()}</span>}
+            {store.approved_at && <span><strong>Approved:</strong> {new Date(store.approved_at).toLocaleDateString()}</span>}
           </div>
         </div>
 
-        {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <Card className="border border-gray-200 bg-white">
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
-                <Package className="h-4 w-4" />
-                Total Products
+                <Package className="h-4 w-4" /> Total Products
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-gray-900">{productCount}</div>
-              <p className="text-xs text-gray-500 mt-1">Products listed</p>
             </CardContent>
           </Card>
-
           <Card className="border border-gray-200 bg-white">
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
-                <ShoppingBag className="h-4 w-4" />
-                Total Services
+                <Store className="h-4 w-4" /> Total Services
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-gray-900">{serviceCount}</div>
-              <p className="text-xs text-gray-500 mt-1">Services listed</p>
             </CardContent>
           </Card>
-
           <Card className="border border-gray-200 bg-white">
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
-                <DollarSign className="h-4 w-4" />
-                Total Earnings
+                <DollarSign className="h-4 w-4" /> Total Earnings
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-gray-900">${totalEarnings.toFixed(2)}</div>
-              <p className="text-xs text-gray-500 mt-1">From all orders</p>
             </CardContent>
           </Card>
-
           <Card className="border border-gray-200 bg-white">
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
-                <ShoppingBag className="h-4 w-4" />
-                Total Orders
+                <ShoppingBag className="h-4 w-4" /> Total Orders
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-gray-900">{totalOrders}</div>
-              <p className="text-xs text-gray-500 mt-1">All time orders</p>
+              <div className="text-3xl font-bold text-gray-900">{orders.length}</div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Order Status Breakdown */}
         <Card className="border border-gray-200 bg-white mb-8">
           <CardHeader>
-            <CardTitle className="text-gray-900">Order Status Breakdown</CardTitle>
-            <CardDescription className="text-gray-600">
-              Overview of orders by status
-            </CardDescription>
+            <CardTitle className="text-gray-900">Order status</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -275,50 +336,27 @@ export default function AdminStoreDetail({ storeId }: AdminStoreDetailProps) {
           </CardContent>
         </Card>
 
-        {/* Recent Orders */}
         <Card className="border border-gray-200 bg-white">
           <CardHeader>
-            <CardTitle className="text-gray-900">Recent Orders</CardTitle>
-            <CardDescription className="text-gray-600">
-              Latest orders from this store
-            </CardDescription>
+            <CardTitle className="text-gray-900">Recent orders</CardTitle>
+            <CardDescription className="text-gray-600">Orders for this store</CardDescription>
           </CardHeader>
           <CardContent>
             {orders.length === 0 ? (
-              <div className="text-center py-8 text-gray-600">
-                <ShoppingBag className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                <p>No orders yet</p>
-              </div>
+              <div className="text-center py-8 text-gray-600">No orders yet</div>
             ) : (
               <div className="space-y-4">
                 {orders.slice(0, 10).map((order) => (
-                  <div
-                    key={order.id}
-                    className="flex items-center justify-between p-4 border border-gray-200 rounded-lg"
-                  >
+                  <div key={order.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
                     <div>
-                      <p className="font-semibold text-gray-900">Order #{order.orderNumber}</p>
+                      <p className="font-semibold text-gray-900">#{order.order_number}</p>
                       <p className="text-sm text-gray-600">
-                        {order.customerName} • {new Date(order.createdAt).toLocaleDateString()}
+                        {order.sender_name ?? "—"} · {new Date(order.created_at).toLocaleDateString()}
                       </p>
                     </div>
                     <div className="text-right">
-                      <p className="font-bold text-gray-900">${order.total.toFixed(2)}</p>
-                      <Badge
-                        className={
-                          order.status === "pending"
-                            ? "bg-yellow-50 text-yellow-700 border-yellow-200"
-                            : order.status === "confirmed"
-                            ? "bg-blue-50 text-blue-700 border-blue-200"
-                            : order.status === "dispatched"
-                            ? "bg-purple-50 text-purple-700 border-purple-200"
-                            : order.status === "delivered"
-                            ? "bg-green-50 text-green-700 border-green-200"
-                            : "bg-gray-50 text-gray-700 border-gray-200"
-                        }
-                      >
-                        {order.status}
-                      </Badge>
+                      <p className="font-bold text-gray-900">${Number(order.total).toFixed(2)}</p>
+                      <Badge className="bg-gray-100 text-gray-700 border-gray-200">{order.status}</Badge>
                     </div>
                   </div>
                 ))}
@@ -327,7 +365,6 @@ export default function AdminStoreDetail({ storeId }: AdminStoreDetailProps) {
           </CardContent>
         </Card>
 
-        {/* Confirmation Modal */}
         <Dialog open={showConfirmModal} onOpenChange={setShowConfirmModal}>
           <DialogContent className="bg-white border-gray-200">
             <DialogHeader>
@@ -336,36 +373,62 @@ export default function AdminStoreDetail({ storeId }: AdminStoreDetailProps) {
                 {store.status === "suspended" ? "Unsuspend Store" : "Suspend Store"}
               </DialogTitle>
               <DialogDescription className="text-gray-600">
-                {store.status === "suspended" ? (
-                  <>
-                    Are you sure you want to unsuspend <strong>{store.name}</strong>? 
-                    The store will be able to operate normally again.
-                  </>
-                ) : (
-                  <>
-                    Are you sure you want to suspend <strong>{store.name}</strong>? 
-                    This will prevent the store from operating and may affect existing orders.
-                  </>
-                )}
+                {store.status === "suspended"
+                  ? `Unsuspend ${store.name}? The store will operate normally again.`
+                  : `Suspend ${store.name}? This will prevent the store from operating.`}
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => setShowConfirmModal(false)}
-                className="border-2 border-gray-300 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-400"
-              >
+              <Button variant="outline" onClick={() => setShowConfirmModal(false)} className="border-gray-300 bg-white text-gray-700 hover:bg-gray-50">
+                Cancel
+              </Button>
+              <Button onClick={handleSuspendStore} disabled={actionLoading} className={store.status === "suspended" ? "bg-primary text-white hover:bg-primary/90" : "bg-red-600 text-white hover:bg-red-700"}>
+                {actionLoading ? "..." : store.status === "suspended" ? "Unsuspend" : "Suspend"} Store
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={showRejectModal} onOpenChange={setShowRejectModal}>
+          <DialogContent className="bg-white border-gray-200">
+            <DialogHeader>
+              <DialogTitle className="text-gray-900 flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 text-yellow-600" />
+                Reject store application
+              </DialogTitle>
+              <DialogDescription className="text-gray-600">
+                Reject {store.name}? The vendor can resubmit later.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowRejectModal(false)} className="border-gray-300 bg-white text-gray-700 hover:bg-gray-50">
                 Cancel
               </Button>
               <Button
-                onClick={handleSuspendStore}
-                className={
-                  store.status === "suspended"
-                    ? "bg-primary text-white hover:bg-primary/90"
-                    : "bg-red-600 text-white hover:bg-red-700"
-                }
+                onClick={async () => {
+                  setActionLoading(true)
+                  try {
+                    const headers = await getAuthHeaders()
+                    const res = await fetch(`/api/admin/stores/${encodeURIComponent(store.id)}/reject`, { method: "POST", headers })
+                    const data = await res.json().catch(() => ({}))
+                    setShowRejectModal(false)
+                    if (!res.ok) {
+                      showToast(data.error ?? "Failed to reject store.", "error")
+                      return
+                    }
+                    showToast("Store rejected.", "success")
+                    setStore((s) => (s ? { ...s, status: "rejected" } : null))
+                  } catch (e) {
+                    console.error(e)
+                    showToast("Failed to reject store. Please try again.", "error")
+                  } finally {
+                    setActionLoading(false)
+                  }
+                }}
+                disabled={actionLoading}
+                className="bg-red-600 text-white hover:bg-red-700"
               >
-                {store.status === "suspended" ? "Unsuspend" : "Suspend"} Store
+                {actionLoading ? "..." : "Reject"}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -374,4 +437,3 @@ export default function AdminStoreDetail({ storeId }: AdminStoreDetailProps) {
     </div>
   )
 }
-

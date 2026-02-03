@@ -31,15 +31,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { useToast } from "@/components/ui/toast"
-import { getCurrentUserWithProfile, getCurrentUser } from "@/lib/api/auth"
+import { getCurrentUserWithProfile } from "@/lib/api/auth"
 import { supabase } from "@/lib/supabase/client"
 import {
   getPendingStores as getApiPendingStores,
   getAllApprovedStores,
   getSuspendedStores as getApiSuspendedStores,
-  approveStore as apiApproveStore,
-  suspendStore as apiSuspendStore,
-  rejectStore as apiRejectStore,
 } from "@/lib/api/vendors"
 import type { Order } from "@/types"
 
@@ -393,13 +390,18 @@ export default function AdminDashboard() {
   const handleApproveStore = async (storeId: string) => {
     try {
       setActionLoading(storeId)
-      const user = await getCurrentUser()
-      if (!user) return
-      await apiApproveStore(storeId, user.id)
+      const headers = await getAuthHeaders()
+      const res = await fetch(`/api/admin/stores/${encodeURIComponent(storeId)}/approve`, { method: "POST", headers })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        showToast(data.error ?? "Failed to approve store.", "error")
+        return
+      }
+      showToast("Store approved.", "success")
       await loadStoresData()
     } catch (error) {
       console.error("Error approving store:", error)
-      alert("Failed to approve store. Please try again.")
+      showToast("Failed to approve store. Please try again.", "error")
     } finally {
       setActionLoading(null)
     }
@@ -408,11 +410,18 @@ export default function AdminDashboard() {
   const handleRejectStore = async (storeId: string) => {
     try {
       setActionLoading(storeId)
-      await apiRejectStore(storeId)
+      const headers = await getAuthHeaders()
+      const res = await fetch(`/api/admin/stores/${encodeURIComponent(storeId)}/reject`, { method: "POST", headers })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        showToast(data.error ?? "Failed to reject store.", "error")
+        return
+      }
+      showToast("Store rejected.", "success")
       await loadStoresData()
     } catch (error) {
       console.error("Error rejecting store:", error)
-      alert("Failed to reject store. Please try again.")
+      showToast("Failed to reject store. Please try again.", "error")
     } finally {
       setActionLoading(null)
     }
@@ -421,11 +430,22 @@ export default function AdminDashboard() {
   const handleSuspendStore = async (storeId: string) => {
     try {
       setActionLoading(storeId)
-      await apiSuspendStore(storeId)
+      const headers = await getAuthHeaders()
+      const res = await fetch(`/api/admin/stores/${encodeURIComponent(storeId)}/suspend`, {
+        method: "POST",
+        headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify({ unsuspend: false }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        showToast(data.error ?? "Failed to suspend store.", "error")
+        return
+      }
+      showToast("Store suspended.", "success")
       await loadStoresData()
     } catch (error) {
       console.error("Error suspending store:", error)
-      alert("Failed to suspend store. Please try again.")
+      showToast("Failed to suspend store. Please try again.", "error")
     } finally {
       setActionLoading(null)
     }
@@ -434,13 +454,22 @@ export default function AdminDashboard() {
   const handleReactivateStore = async (storeId: string) => {
     try {
       setActionLoading(storeId)
-      const user = await getCurrentUser()
-      if (!user) return
-      await apiApproveStore(storeId, user.id)
+      const headers = await getAuthHeaders()
+      const res = await fetch(`/api/admin/stores/${encodeURIComponent(storeId)}/suspend`, {
+        method: "POST",
+        headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify({ unsuspend: true }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        showToast(data.error ?? "Failed to reactivate store.", "error")
+        return
+      }
+      showToast("Store reactivated.", "success")
       await loadStoresData()
     } catch (error) {
       console.error("Error reactivating store:", error)
-      alert("Failed to reactivate store. Please try again.")
+      showToast("Failed to reactivate store. Please try again.", "error")
     } finally {
       setActionLoading(null)
     }
@@ -514,13 +543,13 @@ export default function AdminDashboard() {
       })
       const data = await res.json()
       if (!res.ok) {
-        alert(data.error || "Failed to save overview videos")
+        showToast(data.error || "Failed to save overview videos", "error")
         return
       }
-      alert("Overview videos saved.")
+      showToast("Overview videos saved.", "success")
     } catch (e) {
       console.error("Save overview videos error:", e)
-      alert("Failed to save overview videos.")
+      showToast("Failed to save overview videos.", "error")
     } finally {
       setOverviewVideosSaving(false)
     }
@@ -817,7 +846,7 @@ export default function AdminDashboard() {
                                     size="sm"
                                     onClick={() => handleRejectStore(store.id)}
                                     disabled={actionLoading === store.id}
-                                    className="border-red-200 text-red-600 hover:bg-red-50"
+                                    className="border-gray-200 bg-gray-50 text-gray-600 hover:bg-gray-100 hover:border-gray-300"
                                   >
                                     {actionLoading === store.id ? "..." : "Reject"}
                                   </Button>

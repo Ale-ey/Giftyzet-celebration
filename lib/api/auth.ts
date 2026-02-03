@@ -47,7 +47,7 @@ export async function signUp(data: SignUpData & { vendor_name?: string }) {
         role: data.role || 'user',
         ...(data.vendor_name && { vendor_name: data.vendor_name }),
       },
-      emailRedirectTo: `${typeof window !== 'undefined' ? window.location.origin : ''}/auth/callback`
+      emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000')}/auth/callback`
     }
   })
 

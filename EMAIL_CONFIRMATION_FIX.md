@@ -106,6 +106,21 @@ Or run the updated `supabase/QUICK_FIX.sql` which includes everything.
    - Login as vendor
    - Should redirect to `/vendor/dashboard` (not `/profile`)
 
+## Fix "Could not complete sign in" (Redirect URL)
+
+If after clicking the confirmation link you see **"Could not complete sign in. Please try the link again."** and a "Go to home" button, Supabase is likely not redirecting to our callback with a valid code. Configure Supabase so the confirmation link sends users to our callback:
+
+1. Open **Supabase Dashboard** → **Authentication** → **URL Configuration**.
+2. Set **Site URL** to your app’s public URL, e.g.:
+   - Local: `http://localhost:3000`
+   - Production: `https://yourdomain.com`
+3. Under **Redirect URLs**, add:
+   - `http://localhost:3000/auth/callback`
+   - `https://yourdomain.com/auth/callback` (for production)
+4. Save. New confirmation emails will use these URLs.
+
+If the link was already used or expired, go home and **sign in with your email and password**; your account is already confirmed.
+
 ## Notes
 
 - Email confirmation is required by default in Supabase

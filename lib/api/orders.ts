@@ -246,49 +246,40 @@ export async function updateVendorOrderStatus(orderId: string, vendorId: string,
   return data
 }
 
-// Confirm gift receiver address
-export async function confirmGiftReceiver(giftToken: string, receiverAddress: string) {
-  // Find order by gift token
-  const { data: order, error: findError } = await supabase
-    .from('orders')
-    .select('*')
-    .eq('gift_token', giftToken)
-    .single()
-
-  if (findError) throw findError
-
-  // Update order with receiver address and confirm
-  const { data, error } = await supabase
-    .from('orders')
-    .update({
-      receiver_address: receiverAddress,
-      status: 'confirmed',
-      confirmed_at: new Date().toISOString(),
-    })
-    .eq('id', order.id)
-    .select()
-    .single()
-
-  if (error) throw error
-
-  // Update vendor orders status
-  await supabase
-    .from('vendor_orders')
-    .update({ status: 'confirmed' })
-    .eq('order_id', order.id)
-
-  return data
+// Confirm gift receiver address and contact details (uses RPC so recipient page works for anon and plugin orders)
+export interface ConfirmGiftReceiverData {
+  receiverAddress: string
+  receiverName?: string
+  receiverEmail?: string
+  receiverPhone?: string
 }
 
-// Get order by gift token
-export async function getOrderByGiftToken(giftToken: string) {
-  const { data, error } = await supabase
-    .from('orders')
-    .select('*, order_items(*)')
-    .eq('gift_token', giftToken)
-    .single()
-
+export async function confirmGiftReceiver(
+  giftToken: string,
+  data: ConfirmGiftReceiverData | string
+) {
+  const address = typeof data === 'string' ? data : data.receiverAddress
+  const name = typeof data === 'string' ? undefined : data.receiverName
+  const email = typeof data === 'string' ? undefined : data.receiverEmail
+  const phone = typeof data === 'string' ? undefined : data.receiverPhone
+  const { data: result, error } = await supabase.rpc('confirm_gift_receiver', {
+    p_gift_token: giftToken,
+    p_receiver_address: address,
+    p_receiver_name: name ?? null,
+    p_receiver_email: email ?? null,
+    p_receiver_phone: phone ?? null,
+  })
   if (error) throw error
-  return data
+  return result as Record<string, unknown>
+}
+
+// Get order by gift token (uses RPC so recipient page works for anon and plugin orders)
+export async function getOrderByGiftToken(giftToken: string) {
+  const { data, error } = await supabase.rpc('get_order_by_gift_token', {
+    p_gift_token: giftToken,
+  })
+  if (error) throw error
+  if (data == null) throw new Error('Gift not found')
+  return data as { order_items?: unknown[] } & Record<string, unknown>
 }
 

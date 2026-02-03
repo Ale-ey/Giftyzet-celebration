@@ -75,6 +75,15 @@ export async function POST(req: NextRequest) {
       const orderId = vo.order_id
       const storeId = vo.store_id
 
+      const { data: orderRow } = await supabase
+        .from("orders")
+        .select("order_type, plugin_fee")
+        .eq("id", orderId)
+        .single()
+
+      const isPluginOrder = orderRow?.order_type === "plugin"
+      const pluginFee = Math.round((Number(orderRow?.plugin_fee ?? 0)) * 100) / 100
+
       const { data: orderItems } = await supabase
         .from("order_items")
         .select("id, product_id, service_id, price, quantity")
@@ -83,30 +92,37 @@ export async function POST(req: NextRequest) {
       if (!orderItems?.length) continue
 
       let vendorTotal = 0
-      for (const item of orderItems) {
-        if (item.product_id) {
-          const { data: product } = await supabase
-            .from("products")
-            .select("store_id")
-            .eq("id", item.product_id)
-            .single()
-          if (product?.store_id === storeId) {
-            vendorTotal += Number(item.price) * (item.quantity || 1)
-          }
-        } else if (item.service_id) {
-          const { data: service } = await supabase
-            .from("services")
-            .select("store_id")
-            .eq("id", item.service_id)
-            .single()
-          if (service?.store_id === storeId) {
-            vendorTotal += Number(item.price) * (item.quantity || 1)
+      if (isPluginOrder) {
+        for (const item of orderItems) {
+          vendorTotal += Number(item.price) * (item.quantity || 1)
+        }
+      } else {
+        for (const item of orderItems) {
+          if (item.product_id) {
+            const { data: product } = await supabase
+              .from("products")
+              .select("store_id")
+              .eq("id", item.product_id)
+              .single()
+            if (product?.store_id === storeId) {
+              vendorTotal += Number(item.price) * (item.quantity || 1)
+            }
+          } else if (item.service_id) {
+            const { data: service } = await supabase
+              .from("services")
+              .select("store_id")
+              .eq("id", item.service_id)
+              .single()
+            if (service?.store_id === storeId) {
+              vendorTotal += Number(item.price) * (item.quantity || 1)
+            }
           }
         }
       }
 
       const commissionAmount = Math.round((vendorTotal * commissionPercent) / 100 * 100) / 100
-      const vendorAmount = Math.round((vendorTotal - commissionAmount) * 100) / 100
+      const vendorAmountRaw = vendorTotal - commissionAmount - pluginFee
+      const vendorAmount = Math.max(0, Math.round(vendorAmountRaw * 100) / 100)
       const orderTotal = Math.round(vendorTotal * 100) / 100
 
       const { data: storeRow } = await supabase

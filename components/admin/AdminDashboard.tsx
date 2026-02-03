@@ -43,7 +43,7 @@ import {
 } from "@/lib/api/vendors"
 import type { Order } from "@/types"
 
-type TabId = "stores" | "commission" | "queries" | "pluginQueries" | "payouts"
+type TabId = "stores" | "commission" | "queries" | "pluginQueries" | "payouts" | "pluginOrders"
 type StoreStatusFilter = "all" | "pending" | "approved" | "suspended"
 
 interface ContactSubmission {
@@ -76,6 +76,24 @@ interface PayoutRow {
   delivered_at: string
   status: "pending" | "paid" | "failed"
   paid_at?: string
+}
+
+interface PluginOrderRow {
+  id: string
+  order_number: string
+  external_order_id: string | null
+  store_name: string
+  vendor_name: string
+  integration_name: string
+  status: string
+  payment_status: string
+  total: number
+  commission_percent: number
+  commission_amount: number
+  plugin_fee: number
+  vendor_amount: number
+  created_at: string
+  confirmed_at: string | null
 }
 
 export default function AdminDashboard() {
@@ -121,6 +139,13 @@ export default function AdminDashboard() {
   const [overviewVideosSaving, setOverviewVideosSaving] = useState(false)
   const [showConfirmSettingsModal, setShowConfirmSettingsModal] = useState(false)
   const { showToast } = useToast()
+
+  const [pluginOrders, setPluginOrders] = useState<PluginOrderRow[]>([])
+  const [pluginOrdersTotal, setPluginOrdersTotal] = useState(0)
+  const [pluginOrdersLoading, setPluginOrdersLoading] = useState(false)
+  const [pluginOrdersError, setPluginOrdersError] = useState<string | null>(null)
+  const [pluginOrdersPage, setPluginOrdersPage] = useState(1)
+  const [pluginOrdersStatus, setPluginOrdersStatus] = useState<string>("all")
 
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -315,6 +340,36 @@ export default function AdminDashboard() {
     }
     fetchPluginQueries()
   }, [isAuthorized, activeTab])
+
+  useEffect(() => {
+    if (!isAuthorized || activeTab !== "pluginOrders") return
+    const fetchPluginOrders = async () => {
+      setPluginOrdersLoading(true)
+      setPluginOrdersError(null)
+      try {
+        const headers = await getAuthHeaders()
+        const q = new URLSearchParams()
+        q.set("page", String(pluginOrdersPage))
+        q.set("per_page", "20")
+        if (pluginOrdersStatus !== "all") q.set("status", pluginOrdersStatus)
+        const res = await fetch(`/api/admin/plugin-orders?${q.toString()}`, { headers })
+        const data = await res.json()
+        if (!res.ok) {
+          setPluginOrdersError(data.error || "Failed to load plugin orders")
+          setPluginOrders([])
+          return
+        }
+        setPluginOrders(data.orders ?? [])
+        setPluginOrdersTotal(data.total ?? 0)
+      } catch (e) {
+        setPluginOrdersError("Failed to load plugin orders")
+        setPluginOrders([])
+      } finally {
+        setPluginOrdersLoading(false)
+      }
+    }
+    fetchPluginOrders()
+  }, [isAuthorized, activeTab, pluginOrdersPage, pluginOrdersStatus])
 
   const loadStoresData = async () => {
     try {
@@ -513,6 +568,7 @@ export default function AdminDashboard() {
     { id: "stores", label: "Stores", icon: <Store className="h-4 w-4" /> },
     { id: "commission", label: "Tax & Plugin", icon: <Percent className="h-4 w-4" /> },
     { id: "payouts", label: "Payouts", icon: <Wallet className="h-4 w-4" /> },
+    { id: "pluginOrders", label: "Plugin Orders", icon: <Plug className="h-4 w-4" /> },
     { id: "queries", label: "Contact Queries", icon: <MessageSquare className="h-4 w-4" /> },
     { id: "pluginQueries", label: "Plugin Queries", icon: <Plug className="h-4 w-4" /> },
   ]
@@ -1060,6 +1116,140 @@ export default function AdminDashboard() {
                     </tbody>
                   </table>
                 </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Tab: Plugin Orders */}
+        {activeTab === "pluginOrders" && (
+          <Card className="border border-gray-200 bg-white">
+            <CardHeader>
+              <CardTitle className="text-gray-900 flex items-center gap-2">
+                <Plug className="h-5 w-5" />
+                Plugin Orders
+              </CardTitle>
+              <CardDescription className="text-gray-600">
+                Orders created via the Plugin API from external selling platforms. Commission and plugin fee are charged from the seller.
+              </CardDescription>
+              <div className="flex flex-wrap items-center gap-3 pt-2">
+                <select
+                  value={pluginOrdersStatus}
+                  onChange={(e) => {
+                    setPluginOrdersStatus(e.target.value)
+                    setPluginOrdersPage(1)
+                  }}
+                  className="h-9 rounded-md border border-gray-200 px-3 text-sm text-gray-700 bg-white"
+                >
+                  <option value="all">Status: All</option>
+                  <option value="pending">Pending</option>
+                  <option value="confirmed">Confirmed</option>
+                  <option value="dispatched">Dispatched</option>
+                  <option value="delivered">Delivered</option>
+                  <option value="cancelled">Cancelled</option>
+                </select>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {pluginOrdersLoading ? (
+                <div className="py-12 text-center text-gray-500">Loading plugin orders...</div>
+              ) : pluginOrdersError ? (
+                <div className="py-12 text-center text-red-600">{pluginOrdersError}</div>
+              ) : pluginOrders.length === 0 ? (
+                <div className="py-12 text-center text-gray-500 flex flex-col items-center gap-2">
+                  <Plug className="h-12 w-12 text-gray-300" />
+                  <p>No plugin orders match your filters.</p>
+                </div>
+              ) : (
+                <>
+                  <div className="overflow-x-auto -mx-4 sm:mx-0">
+                    <table className="w-full border-collapse min-w-[900px]">
+                      <thead>
+                        <tr className="border-b border-gray-200">
+                          <th className="text-left py-3 px-4 text-sm font-semibold text-gray-900">Order #</th>
+                          <th className="text-left py-3 px-4 text-sm font-semibold text-gray-900">External ID</th>
+                          <th className="text-left py-3 px-4 text-sm font-semibold text-gray-900">Integration</th>
+                          <th className="text-left py-3 px-4 text-sm font-semibold text-gray-900">Store</th>
+                          <th className="text-left py-3 px-4 text-sm font-semibold text-gray-900">Vendor</th>
+                          <th className="text-left py-3 px-4 text-sm font-semibold text-gray-900">Status</th>
+                          <th className="text-right py-3 px-4 text-sm font-semibold text-gray-900">Total</th>
+                          <th className="text-right py-3 px-4 text-sm font-semibold text-gray-900">Commission</th>
+                          <th className="text-right py-3 px-4 text-sm font-semibold text-gray-900">Plugin fee</th>
+                          <th className="text-right py-3 px-4 text-sm font-semibold text-gray-900">Vendor amount</th>
+                          <th className="text-left py-3 px-4 text-sm font-semibold text-gray-900">Created</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {pluginOrders.map((row) => (
+                          <tr key={row.id} className="border-b border-gray-100 hover:bg-gray-50/50">
+                            <td className="py-3 px-4 text-sm font-medium text-gray-900">{row.order_number}</td>
+                            <td className="py-3 px-4 text-sm text-gray-600">{row.external_order_id || "—"}</td>
+                            <td className="py-3 px-4 text-sm text-gray-600">{row.integration_name}</td>
+                            <td className="py-3 px-4 text-sm text-gray-600">{row.store_name}</td>
+                            <td className="py-3 px-4 text-sm text-gray-600">{row.vendor_name}</td>
+                            <td className="py-3 px-4">
+                              <Badge
+                                variant="outline"
+                                className={
+                                  row.status === "delivered"
+                                    ? "border-green-200 bg-green-50 text-green-700"
+                                    : row.status === "confirmed" || row.status === "dispatched"
+                                      ? "border-blue-200 bg-blue-50 text-blue-700"
+                                      : row.status === "cancelled"
+                                        ? "border-red-200 bg-red-50 text-red-700"
+                                        : "border-amber-200 bg-amber-50 text-amber-700"
+                                }
+                              >
+                                {row.status}
+                              </Badge>
+                            </td>
+                            <td className="py-3 px-4 text-sm font-medium text-gray-900 text-right">
+                              ${row.total.toFixed(2)}
+                            </td>
+                            <td className="py-3 px-4 text-sm text-gray-600 text-right">
+                              ${row.commission_amount.toFixed(2)}
+                              <span className="text-xs text-gray-400 ml-1">({row.commission_percent}%)</span>
+                            </td>
+                            <td className="py-3 px-4 text-sm text-gray-600 text-right">
+                              ${row.plugin_fee.toFixed(2)}
+                            </td>
+                            <td className="py-3 px-4 text-sm font-medium text-primary text-right">
+                              ${row.vendor_amount.toFixed(2)}
+                            </td>
+                            <td className="py-3 px-4 text-sm text-gray-500 whitespace-nowrap">
+                              {formatPayoutDate(row.created_at)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {pluginOrdersTotal > 20 && (
+                    <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-200">
+                      <p className="text-sm text-gray-600">
+                        Showing {(pluginOrdersPage - 1) * 20 + 1}–{Math.min(pluginOrdersPage * 20, pluginOrdersTotal)} of {pluginOrdersTotal}
+                      </p>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={pluginOrdersPage <= 1}
+                          onClick={() => setPluginOrdersPage((p) => Math.max(1, p - 1))}
+                        >
+                          Previous
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={pluginOrdersPage >= Math.ceil(pluginOrdersTotal / 20)}
+                          onClick={() => setPluginOrdersPage((p) => p + 1)}
+                        >
+                          Next
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </CardContent>
           </Card>

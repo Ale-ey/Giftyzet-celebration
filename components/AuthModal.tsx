@@ -22,7 +22,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { signUp, signIn } from "@/lib/api/auth";
-import { createVendor, createStore } from "@/lib/api/vendors";
 import { getCurrentUser } from "@/lib/api/auth";
 
 interface AuthModalProps {
@@ -122,14 +121,13 @@ export default function AuthModal({
           }
         }
       } else if (mode === "signup-vendor") {
-        // Vendor sign up
+        // Vendor sign up — same as user signup, just role + vendor_name; trigger creates vendor+store
         if (!vendorName.trim()) {
           setError("Business/Vendor name is required");
           setLoading(false);
           return;
         }
 
-        // Create user account
         const { user, needsEmailConfirmation } = await signUp({
           email,
           password,
@@ -143,43 +141,14 @@ export default function AuthModal({
         }
 
         if (needsEmailConfirmation) {
-          // Show email confirmation message
-          // Vendor profile will be created after email confirmation via trigger
           setEmailSent(true);
           setSignupEmail(email);
           resetForm();
         } else {
-          // Email confirmation disabled - create vendor immediately
-          try {
-            // Create vendor profile
-            const vendor = await createVendor(user.id, {
-              vendor_name: vendorName,
-              email: email,
-              business_name: vendorName,
-            });
-
-            // Create store with pending status
-            await createStore(vendor.id, {
-              name: vendorName,
-              description: `Store for ${vendorName}`,
-            });
-
-            window.dispatchEvent(new Event("authUpdated"));
-            onClose();
-            resetForm();
-            // Redirect to store registration page
-            router.push("/vendor/register-store");
-          } catch (vendorError: any) {
-            // If vendor creation fails, still show email confirmation
-            // Vendor can be created after email confirmation
-            console.warn(
-              "Vendor creation failed, will be created after email confirmation:",
-              vendorError,
-            );
-            setEmailSent(true);
-            setSignupEmail(email);
-            resetForm();
-          }
+          window.dispatchEvent(new Event("authUpdated"));
+          onClose();
+          resetForm();
+          router.push("/vendor/register-store");
         }
       }
     } catch (err: any) {

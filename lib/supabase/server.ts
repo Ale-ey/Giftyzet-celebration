@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
 /**
  * Get Supabase client for server (e.g. API routes).
@@ -13,6 +14,15 @@ export function createServerSupabase(accessToken?: string | null) {
       global: { headers: { Authorization: `Bearer ${accessToken}` } },
     }),
   })
+}
+
+/**
+ * Service-role client (bypasses RLS). Use only in server code after verifying admin.
+ * Requires SUPABASE_SERVICE_ROLE_KEY in env.
+ */
+export function createServiceRoleSupabase() {
+  if (!supabaseServiceRoleKey) return null
+  return createClient(supabaseUrl, supabaseServiceRoleKey)
 }
 
 /**

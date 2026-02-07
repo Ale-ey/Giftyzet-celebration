@@ -1,8 +1,10 @@
 -- ============================================
--- Auth signup: create public.users (and vendor+store if role=vendor) on INSERT
--- Everything happens on signup INSERT so vendor signup = same flow as user signup
+-- RUN THIS ONCE in Supabase Dashboard → SQL Editor
+-- One signup API: if payload has role=vendor, register as vendor (public.users + vendor + store).
+-- Only one trigger (INSERT); no UPDATE trigger.
 -- ============================================
 
+-- 1) Function: create public.users; if role=vendor also create vendor+store (never abort signup)
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -15,19 +17,21 @@ DECLARE
   vendor_name text;
   base_name text;
   suffix int;
+  meta jsonb;
 BEGIN
-  user_role := COALESCE(trim(COALESCE(NEW.raw_user_meta_data, '{}'::jsonb)->>'role'), 'user');
+  meta := COALESCE(NEW.raw_user_meta_data, '{}'::jsonb);
+  user_role := COALESCE(trim(meta->>'role'), 'user');
   IF user_role NOT IN ('user', 'vendor', 'admin') THEN
     user_role := 'user';
   END IF;
 
   user_name := COALESCE(
-    nullif(trim(COALESCE(NEW.raw_user_meta_data, '{}'::jsonb)->>'name'), ''),
-    nullif(trim(COALESCE(NEW.raw_user_meta_data, '{}'::jsonb)->>'full_name'), ''),
+    nullif(trim(meta->>'name'), ''),
+    nullif(trim(meta->>'full_name'), ''),
     split_part(NEW.email, '@', 1)
   );
 
-  -- 1) Create public.users row (same for user and vendor)
+  -- Always create/update public.users (same for user and vendor)
   INSERT INTO public.users (id, email, name, role)
   VALUES (NEW.id, NEW.email, user_name, user_role)
   ON CONFLICT (id) DO UPDATE SET
@@ -36,13 +40,13 @@ BEGIN
     role = EXCLUDED.role,
     updated_at = now();
 
-  -- 2) If vendor, create vendor + store in same trigger (so no UPDATE trigger needed for signup)
+  -- If vendor: create vendor + store (best effort; never abort)
   IF user_role = 'vendor' THEN
     BEGIN
       IF NOT EXISTS (SELECT 1 FROM public.vendors WHERE user_id = NEW.id) THEN
         vendor_name := COALESCE(
-          nullif(trim(COALESCE(NEW.raw_user_meta_data, '{}'::jsonb)->>'vendor_name'), ''),
-          nullif(trim(COALESCE(NEW.raw_user_meta_data, '{}'::jsonb)->>'name'), ''),
+          nullif(trim(meta->>'vendor_name'), ''),
+          nullif(trim(meta->>'name'), ''),
           split_part(NEW.email, '@', 1)
         );
         IF vendor_name IS NULL OR vendor_name = '' THEN
@@ -64,7 +68,8 @@ BEGIN
           AND NOT EXISTS (SELECT 1 FROM public.stores s WHERE s.vendor_id = v.id);
       END IF;
     EXCEPTION
-      WHEN OTHERS THEN NULL;  /* never abort signup */
+      WHEN OTHERS THEN
+        NULL;  /* never abort signup */
     END;
   END IF;
 
@@ -76,11 +81,15 @@ EXCEPTION
     WHERE id = NEW.id;
     RETURN NEW;
   WHEN OTHERS THEN
-    RETURN NEW;  /* never abort */
+    RETURN NEW;  /* never abort: auth user is created */
 END;
 $$;
 
-COMMENT ON FUNCTION public.handle_new_user() IS 'Creates public.users and (if role=vendor) vendor+store on signup INSERT. One trigger for user and vendor signup.';
+-- 2) Only one trigger: on INSERT. Drop UPDATE trigger so it can't cause "Database error updating user"
+DROP TRIGGER IF EXISTS on_email_confirmed ON auth.users;
 
--- Triggers on auth.users require ownership of that table. Migrations run as a role that
--- may not own auth.users. Run supabase/auth_triggers_manual.sql once in Dashboard → SQL Editor.
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW
+  EXECUTE FUNCTION public.handle_new_user();

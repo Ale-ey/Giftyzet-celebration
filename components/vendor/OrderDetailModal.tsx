@@ -189,15 +189,27 @@ export default function OrderDetailModal({ isOpen, onClose, order, onStatusUpdat
 
                   {/* Receiver Details (Ship To) */}
                   <div className={`p-4 rounded-lg border ${
-                    order.receiverAddress 
-                      ? "bg-green-50 border-green-200" 
-                      : "bg-yellow-50 border-yellow-200"
+                    order.status === "cancelled"
+                      ? "bg-red-50 border-red-200"
+                      : order.receiverAddress
+                        ? "bg-green-50 border-green-200"
+                        : "bg-yellow-50 border-yellow-200"
                   }`}>
                     <h4 className="font-semibold text-gray-900 mb-3 flex items-center">
                       <MapPin className="h-4 w-4 mr-2" />
                       Receiver (Ship To)
                     </h4>
-                    {order.receiverAddress ? (
+                    {order.status === "cancelled" ? (
+                      <div className="space-y-2">
+                        <p className="text-sm text-red-700 font-medium">
+                          Receiver rejected the gift. Please contact the sender.
+                        </p>
+                        <div className="text-xs text-red-600 mt-2">
+                          <p>Gift link was sent to:</p>
+                          <p className="font-medium">{order.receiverEmail || "Email pending"}</p>
+                        </div>
+                      </div>
+                    ) : order.receiverAddress ? (
                       <div className="space-y-2 text-sm">
                         <div>
                           <p className="text-gray-600 font-medium">Name:</p>

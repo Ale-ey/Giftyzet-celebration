@@ -320,15 +320,27 @@ export default function ViewOrderPage() {
 
                     {/* Receiver Info (Ship To) */}
                     <div className={`p-4 rounded-lg border ${
-                      order.receiver_address 
-                        ? 'bg-green-50 border-green-200' 
-                        : 'bg-yellow-50 border-yellow-200'
+                      order.status === 'cancelled'
+                        ? 'bg-red-50 border-red-200'
+                        : order.receiver_address
+                          ? 'bg-green-50 border-green-200'
+                          : 'bg-yellow-50 border-yellow-200'
                     }`}>
                       <h3 className="font-semibold text-gray-900 mb-3 flex items-center">
                         <MapPin className="h-4 w-4 mr-2" />
                         Receiver (Ship To)
                       </h3>
-                      {order.receiver_address ? (
+                      {order.status === 'cancelled' ? (
+                        <div className="space-y-2">
+                          <p className="text-sm text-red-700 font-medium">
+                            Receiver rejected the gift. Please contact the sender.
+                          </p>
+                          <div className="text-xs text-red-600 mt-3">
+                            <p className="font-medium mb-1">Gift link was sent to:</p>
+                            <p>{order.receiver_email || 'Receiver email pending'}</p>
+                          </div>
+                        </div>
+                      ) : order.receiver_address ? (
                         <div className="space-y-3 text-sm">
                           <div>
                             <p className="text-gray-600 font-medium mb-1">Name</p>

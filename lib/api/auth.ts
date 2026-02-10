@@ -139,65 +139,33 @@ export async function signIn(data: SignInData) {
   return authData
 }
 
-// Sign out - clears all user data
+// Sign out - clears all user data (vendor/admin/user). Caller should redirect to landing (e.g. router.push('/')).
 export async function signOut() {
   try {
     // Sign out from Supabase
     const { error } = await supabase.auth.signOut()
-    
-    // Clear all local storage data regardless of Supabase sign out result
+
+    // Clear entire localStorage so vendor/admin have no leftover session or role data
     if (typeof window !== 'undefined') {
-      // Clear auth-related localStorage items
-      localStorage.removeItem('auth')
-      
-      // Clear cart (optional - you might want to keep cart for guest users)
-      // localStorage.removeItem('cart')
-      
-      // Clear any other user-specific data
-      const keysToRemove: string[] = []
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i)
-        if (key && (key.startsWith('profile_') || key.startsWith('gift_'))) {
-          keysToRemove.push(key)
-        }
-      }
-      keysToRemove.forEach(key => localStorage.removeItem(key))
-      
-      // Dispatch event to notify components
+      localStorage.clear()
       window.dispatchEvent(new Event('authUpdated'))
       window.dispatchEvent(new Event('cartUpdated'))
     }
-    
-    // If Supabase sign out had an error, log it but don't throw
-    // (local storage is already cleared, so logout is effectively complete)
+
     if (error) {
       console.warn('Supabase sign out error (local data cleared):', error)
-      // Don't throw - logout is still successful from user perspective
     }
   } catch (error) {
-    // If there's any other error, still try to clear local storage
     console.error('Sign out error:', error)
-    
-    // Clear local storage even if there's an error
     if (typeof window !== 'undefined') {
       try {
-        localStorage.removeItem('auth')
-        const keysToRemove: string[] = []
-        for (let i = 0; i < localStorage.length; i++) {
-          const key = localStorage.key(i)
-          if (key && (key.startsWith('profile_') || key.startsWith('gift_'))) {
-            keysToRemove.push(key)
-          }
-        }
-        keysToRemove.forEach(key => localStorage.removeItem(key))
+        localStorage.clear()
         window.dispatchEvent(new Event('authUpdated'))
         window.dispatchEvent(new Event('cartUpdated'))
       } catch (clearError) {
         console.error('Error clearing local storage:', clearError)
       }
     }
-    
-    // Re-throw only if we couldn't clear local storage
     throw error
   }
 }

@@ -24,6 +24,7 @@ export default function GiftReceiverPage() {
   const [loading, setLoading] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [rejected, setRejected] = useState(false)
+  const [rejectedByUserThisSession, setRejectedByUserThisSession] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [rejectModalOpen, setRejectModalOpen] = useState(false)
 
@@ -32,6 +33,11 @@ export default function GiftReceiverPage() {
       try {
         const orderData = await getOrderByGiftToken(token)
         setOrder(orderData)
+        // If receiver already rejected (order cancelled), treat as expired – no form, no actions
+        if (orderData.status === "cancelled") {
+          setRejected(true)
+          return
+        }
         setReceiverName(String(orderData.receiver_name ?? ""))
         setReceiverEmail(String(orderData.receiver_email ?? ""))
         setReceiverPhone(String(orderData.receiver_phone ?? ""))
@@ -101,6 +107,7 @@ export default function GiftReceiverPage() {
     try {
       await rejectGiftReceiver(token)
       setRejectModalOpen(false)
+      setRejectedByUserThisSession(true)
       setRejected(true)
       window.dispatchEvent(new Event("ordersUpdated"))
       showToast("Gift rejected. The sender will be notified.", "info")
@@ -173,9 +180,13 @@ export default function GiftReceiverPage() {
         <Card className="max-w-md w-full bg-white border-2 border-red-500 shadow-lg">
           <CardContent className="p-8 text-center">
             <XCircle className="h-16 w-16 text-red-500 mx-auto mb-4" />
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Gift Rejected</h2>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">
+              {rejectedByUserThisSession ? "Gift Rejected" : "This Gift Link Is No Longer Valid"}
+            </h2>
             <p className="text-gray-600 mb-6">
-              You have declined this gift. The sender has been notified.
+              {rejectedByUserThisSession
+                ? "You have declined this gift. The sender has been notified."
+                : "This gift was declined. This link has expired and cannot be used."}
             </p>
             <Button
               onClick={() => router.push("/marketplace")}
@@ -367,9 +378,9 @@ export default function GiftReceiverPage() {
           </CardContent>
         </Card>
 
-        {/* Reject confirmation modal (in-app, no browser popup) */}
+        {/* Reject confirmation: in-app modal only (no window.confirm / browser popup) */}
         <Dialog open={rejectModalOpen} onOpenChange={(open) => !loading && setRejectModalOpen(open)}>
-          <DialogContent className="sm:max-w-md">
+          <DialogContent className="sm:max-w-md z-[100] bg-white shadow-xl">
             <DialogHeader>
               <div className="flex items-center justify-center w-16 h-16 mx-auto mb-4 rounded-full bg-red-100">
                 <XCircle className="h-8 w-8 text-red-600" />

@@ -131,6 +131,29 @@ export default function StoreRegistrationPage() {
             router.push("/vendor")
             return
           }
+        } else {
+          // No store yet: pre-fill store form from vendor profile / signup info
+          setFormData((prev) => ({
+            ...prev,
+            name:
+              prev.name ||
+              vendor.business_name ||
+              vendor.vendor_name ||
+              userProfile.name ||
+              user.email?.split("@")[0] ||
+              "",
+            email:
+              prev.email ||
+              vendor.email ||
+              user.email ||
+              "",
+            address: prev.address,
+            phone: prev.phone,
+            website: prev.website,
+            logo_url: prev.logo_url,
+            description: prev.description,
+            category: prev.category,
+          }))
         }
       } else {
         // Vendor doesn't exist and couldn't be created

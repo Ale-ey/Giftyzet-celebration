@@ -37,7 +37,14 @@ export async function createVendor(userId: string, vendorData: VendorData) {
     .select()
     .single()
 
-  if (error) throw error
+  if (error) {
+    // Handle unique constraint on vendor_name (vendors_vendor_name_key)
+    // Supabase/Postgres error code 23505 = duplicate key
+    if ((error as any).code === '23505') {
+      throw new Error('A vendor with this name already exists. Please choose a different store name.')
+    }
+    throw error
+  }
   return data
 }
 

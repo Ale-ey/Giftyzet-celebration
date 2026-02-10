@@ -151,9 +151,9 @@ export default function Header() {
       setUserRole("user");
       setIsMenuOpen(false);
       showToast("Signed out successfully", "success");
-      // Small delay to show toast before redirect
+      // Redirect to landing (replace so vendor/admin cannot go back to protected pages)
       setTimeout(() => {
-        router.push("/");
+        router.replace("/");
       }, 500);
     } catch (error: any) {
       console.error("Sign out error:", error);

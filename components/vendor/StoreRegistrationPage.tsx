@@ -86,20 +86,32 @@ export default function StoreRegistrationPage() {
         return
       }
 
+      // Vendor name from signup (Business/Vendor Name they entered)
+      const vendorNameFromSignup =
+        (userProfile as any)?.user_metadata?.vendor_name ||
+        userProfile?.name ||
+        user?.email?.split("@")[0] ||
+        "Vendor"
+      const accountEmail = user?.email || ""
+
       let vendor = await getVendorByUserId(user.id)
-      
-      // If vendor doesn't exist, create it
+
+      // If vendor doesn't exist, create it using the name they entered at signup
       if (!vendor) {
         try {
           vendor = await createVendor(user.id, {
-            vendor_name: userProfile.name || user.email?.split("@")[0] || "Vendor",
-            email: user.email || "",
-            business_name: userProfile.name || user.email?.split("@")[0] || "Vendor"
+            vendor_name: vendorNameFromSignup,
+            email: accountEmail,
+            business_name: vendorNameFromSignup,
           })
         } catch (createError: any) {
-          console.error("Error creating vendor:", createError)
-          // If creation fails, still allow form to be shown
-          // Vendor might be created by trigger later
+          // Duplicate vendor_name: trigger may have created vendor; re-fetch
+          if ((createError as any)?.code === "23505" || createError?.message?.includes("duplicate")) {
+            vendor = await getVendorByUserId(user.id)
+          }
+          if (!vendor) {
+            console.error("Error creating vendor:", createError)
+          }
         }
       }
 
@@ -113,14 +125,14 @@ export default function StoreRegistrationPage() {
           setStoreStatus(store.status)
           setStripeConnected(!!(store as any).stripe_onboarding_complete || !!(store as any).stripe_account_id)
           setFormData({
-            name: store.name || "",
+            name: store.name || vendor.vendor_name || vendorNameFromSignup,
             description: store.description || "",
             category: store.category || "",
             address: store.address || "",
             phone: store.phone || "",
-            email: store.email || "",
+            email: store.email || accountEmail,
             website: store.website || "",
-            logo_url: store.logo_url || ""
+            logo_url: store.logo_url || "",
           })
           if (store.logo_url) {
             setLogoPreview(store.logo_url)
@@ -132,23 +144,13 @@ export default function StoreRegistrationPage() {
             return
           }
         } else {
-          // No store yet: pre-fill store form from vendor profile / signup info
+          // No store yet: pre-fill Store Name = vendor name, Email = signup email
           setFormData((prev) => ({
             ...prev,
-            name:
-              prev.name ||
-              vendor.business_name ||
-              vendor.vendor_name ||
-              userProfile.name ||
-              user.email?.split("@")[0] ||
-              "",
-            email:
-              prev.email ||
-              vendor.email ||
-              user.email ||
-              "",
-            address: prev.address,
-            phone: prev.phone,
+            name: vendor.vendor_name || vendor.business_name || vendorNameFromSignup || prev.name,
+            email: vendor.email || accountEmail || prev.email,
+            address: prev.address || vendor.address,
+            phone: prev.phone || vendor.phone,
             website: prev.website,
             logo_url: prev.logo_url,
             description: prev.description,
@@ -156,9 +158,13 @@ export default function StoreRegistrationPage() {
           }))
         }
       } else {
-        // Vendor doesn't exist and couldn't be created
-        // Still show form, but vendor creation will happen on submit
-        showToast("Please complete your vendor profile information", "info")
+        // Vendor doesn't exist and couldn't be created – pre-fill from signup so they can submit
+        setFormData((prev) => ({
+          ...prev,
+          name: vendorNameFromSignup,
+          email: accountEmail,
+        }))
+        showToast("Complete the form below and submit to register your store.", "info")
       }
     } catch (error: any) {
       console.error("Error loading vendor/store:", error)
@@ -270,22 +276,41 @@ export default function StoreRegistrationPage() {
 
       let currentVendorId = vendorId
 
-      // Ensure vendor exists
+      // Ensure vendor exists (use same vendor name as signup to avoid duplicate key)
       if (!currentVendorId) {
+        const userProfile = await getCurrentUserWithProfile()
+        const vendorNameForCreate =
+          (userProfile as any)?.user_metadata?.vendor_name ||
+          formData.name?.trim() ||
+          userProfile?.name ||
+          user.email?.split("@")[0] ||
+          "Vendor"
         try {
-          const userProfile = await getCurrentUserWithProfile()
           const vendor = await createVendor(user.id, {
-            vendor_name: userProfile?.name || formData.name || user.email?.split("@")[0] || "Vendor",
+            vendor_name: vendorNameForCreate,
             email: user.email || formData.email || "",
-            business_name: formData.name || userProfile?.name || "Vendor"
+            business_name: vendorNameForCreate,
           })
           currentVendorId = vendor.id
           setVendorId(vendor.id)
         } catch (createError: any) {
-          console.error("Error creating vendor:", createError)
-          showToast("Failed to create vendor profile. Please try again.", "error")
-          setSaving(false)
-          return
+          // Duplicate vendor_name: vendor may exist (e.g. trigger); re-fetch and continue
+          if ((createError as any)?.code === "23505" || createError?.message?.includes("duplicate")) {
+            const existing = await getVendorByUserId(user.id)
+            if (existing) {
+              currentVendorId = existing.id
+              setVendorId(existing.id)
+            } else {
+              showToast(createError?.message || "A vendor with this name already exists. Please try a different store name.", "error")
+              setSaving(false)
+              return
+            }
+          } else {
+            console.error("Error creating vendor:", createError)
+            showToast(createError?.message || "Failed to create vendor profile. Please try again.", "error")
+            setSaving(false)
+            return
+          }
         }
       }
 
@@ -505,10 +530,12 @@ export default function StoreRegistrationPage() {
                       id="email"
                       type="email"
                       value={formData.email}
-                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                      readOnly
+                      disabled
                       placeholder="store@example.com"
-                      className="bg-white border-gray-200 text-gray-900"
+                      className="bg-gray-100 border-gray-200 text-gray-700 cursor-not-allowed"
                     />
+                    <p className="text-xs text-gray-500">From your sign-up account (cannot be changed here).</p>
                   </div>
                 </div>
 

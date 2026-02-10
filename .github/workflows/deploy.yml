@@ -10,9 +10,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # 1️Checkout the code
       - name: Checkout code
         uses: actions/checkout@v3
 
+      # 2️ Deploy to EC2
       - name: Deploy to EC2
         uses: appleboy/ssh-action@v0.1.7
         with:
@@ -21,7 +23,31 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
             cd ~/Giftyzet-celebration || exit 1
-            ./deploy.sh
+
+            # 2a️⃣ Update .env.production with latest secrets
+            cat > .env.production <<EOL
+NEXT_PUBLIC_SUPABASE_URL=${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=${{ secrets.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY }}
+STRIPE_SECRET_KEY=${{ secrets.STRIPE_SECRET_KEY }}
+NEXT_PUBLIC_SITE_URL=${{ secrets.NEXT_PUBLIC_SITE_URL }}
+RESEND_API_KEY=${{ secrets.RESEND_API_KEY }}
+RESEND_FROM_EMAIL=${{ secrets.RESEND_FROM_EMAIL }}
+TWILIO_ACCOUNT_SID=${{ secrets.TWILIO_ACCOUNT_SID }}
+TWILIO_AUTH_TOKEN=${{ secrets.TWILIO_AUTH_TOKEN }}
+TWILIO_PHONE_NUMBER=${{ secrets.TWILIO_PHONE_NUMBER }}
+EOL
+
+            # 2b️⃣ Install dependencies (optional if needed)
+            npm install
+
+            # 2c️⃣ Build Next.js app in production mode
+            npm run build
+
+            # 2d️⃣ Restart app with PM2
+            pm2 restart your_app_name || pm2 start npm --name "your_app_name" -- start
+
+        # 3️GitHub Actions secrets passed for reference in the script
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}

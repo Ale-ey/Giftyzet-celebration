@@ -16,7 +16,7 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 DECLARE
-  order_id uuid;
+  v_order_id uuid;
   order_row public.orders%ROWTYPE;
   v_name text;
   v_email text;
@@ -25,8 +25,8 @@ BEGIN
   IF p_gift_token IS NULL OR trim(p_gift_token) = '' OR p_receiver_address IS NULL OR trim(p_receiver_address) = '' THEN
     RAISE EXCEPTION 'gift_token and receiver_address are required';
   END IF;
-  SELECT id INTO order_id FROM public.orders WHERE gift_token = trim(p_gift_token);
-  IF order_id IS NULL THEN
+  SELECT id INTO v_order_id FROM public.orders WHERE gift_token = trim(p_gift_token);
+  IF v_order_id IS NULL THEN
     RAISE EXCEPTION 'Gift not found';
   END IF;
   v_name := NULLIF(trim(p_receiver_name), '');
@@ -41,9 +41,9 @@ BEGIN
     status = 'confirmed',
     confirmed_at = NOW(),
     updated_at = NOW()
-  WHERE id = order_id;
-  UPDATE public.vendor_orders SET status = 'confirmed', updated_at = NOW() WHERE order_id = order_id;
-  SELECT * INTO order_row FROM public.orders WHERE id = order_id;
+  WHERE id = v_order_id;
+  UPDATE public.vendor_orders SET status = 'confirmed', updated_at = NOW() WHERE order_id = v_order_id;
+  SELECT * INTO order_row FROM public.orders WHERE id = v_order_id;
   RETURN to_jsonb(order_row);
 END;
 $$;

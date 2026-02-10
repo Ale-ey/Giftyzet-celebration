@@ -49,10 +49,27 @@ export async function POST(request: NextRequest) {
         )
       }
 
+      // Always use production base URL in email so the link never contains localhost
+      const baseUrl = (process.env.NEXT_PUBLIC_SITE_URL || '').replace(/\/+$/, '') || 'https://www.giftyzel.com'
+      let pathPart = giftLink
+      if (giftLink.startsWith('http')) {
+        try {
+          const u = new URL(giftLink)
+          pathPart = u.pathname + u.search + u.hash
+        } catch {
+          pathPart = giftLink.replace(/^https?:\/\/[^/]+/, '') || '/'
+        }
+      } else if (!giftLink.startsWith('/')) {
+        pathPart = '/' + giftLink
+      }
+      const giftLinkAbsolute = baseUrl + pathPart
+
+      // Friendly sender: "Giftyzel Team <hello@giftyzel.com>" (email overridable via env)
+      const fromEmail = process.env.RESEND_FROM_EMAIL || 'hello@giftyzel.com'
+      const fromDisplay = `Giftyzel Team <${fromEmail}>`
+
       const { data, error } = await resend.emails.send({
-        // On Resend free tier: use onboarding@resend.dev or a verified domain address.
-// Free tier only allows sending TO your account email (see Resend dashboard).
-from: process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev',
+        from: fromDisplay,
         to: receiverEmail,
         subject: `🎁 ${senderName} sent you a gift!`,
         html: `
@@ -82,7 +99,7 @@ from: process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev',
                 </div>
                 
                 <div style="text-align: center; margin: 30px 0;">
-                  <a href="${giftLink}" 
+                  <a href="${giftLinkAbsolute}" 
                      style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 15px 40px; text-decoration: none; border-radius: 50px; font-weight: bold; font-size: 16px; box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);">
                     View Your Gift & Confirm Address
                   </a>
@@ -98,7 +115,7 @@ from: process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev',
                   If the button doesn't work, copy and paste this link into your browser:
                 </p>
                 <p style="font-size: 12px; color: #667eea; word-break: break-all; background: white; padding: 10px; border-radius: 5px;">
-                  ${giftLink}
+                  ${giftLinkAbsolute}
                 </p>
                 
                 <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0;">

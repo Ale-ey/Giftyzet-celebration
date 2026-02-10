@@ -273,6 +273,15 @@ export async function confirmGiftReceiver(
   return result as Record<string, unknown>
 }
 
+// Reject gift by token (recipient declines; uses RPC so anon can call)
+export async function rejectGiftReceiver(giftToken: string) {
+  const { data: result, error } = await supabase.rpc('reject_gift_receiver', {
+    p_gift_token: giftToken,
+  })
+  if (error) throw error
+  return result as Record<string, unknown>
+}
+
 // Get order by gift token (uses RPC so recipient page works for anon and plugin orders)
 export async function getOrderByGiftToken(giftToken: string) {
   const { data, error } = await supabase.rpc('get_order_by_gift_token', {

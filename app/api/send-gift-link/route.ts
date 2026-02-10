@@ -4,9 +4,15 @@ import twilio from 'twilio'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
-const twilioClient = process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN
-  ? twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN)
-  : null
+// Initialize Twilio client only when a proper Account SID (starts with "AC") is provided.
+// If you accidentally set TWILIO_ACCOUNT_SID to an API key (starts with "SK"),
+// this will skip initialization instead of throwing "accountSid must start with AC" at build time.
+const twilioClient =
+  process.env.TWILIO_ACCOUNT_SID &&
+  process.env.TWILIO_AUTH_TOKEN &&
+  process.env.TWILIO_ACCOUNT_SID.startsWith('AC')
+    ? twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN)
+    : null
 
 export async function POST(request: NextRequest) {
   try {
@@ -44,7 +50,9 @@ export async function POST(request: NextRequest) {
       }
 
       const { data, error } = await resend.emails.send({
-        from: process.env.RESEND_FROM_EMAIL || 'Gift@giftyzel.com',
+        // On Resend free tier: use onboarding@resend.dev or a verified domain address.
+// Free tier only allows sending TO your account email (see Resend dashboard).
+from: process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev',
         to: receiverEmail,
         subject: `🎁 ${senderName} sent you a gift!`,
         html: `
@@ -107,7 +115,10 @@ export async function POST(request: NextRequest) {
       if (error) {
         console.error('Resend error:', error)
         return NextResponse.json(
-          { error: 'Failed to send email', details: error },
+          { 
+            error: 'Failed to send email', 
+            details: (error as any)?.message || error 
+          },
           { status: 500 }
         )
       }

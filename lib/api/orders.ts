@@ -259,15 +259,11 @@ export async function confirmGiftReceiver(
   data: ConfirmGiftReceiverData | string
 ) {
   const address = typeof data === 'string' ? data : data.receiverAddress
-  const name = typeof data === 'string' ? undefined : data.receiverName
-  const email = typeof data === 'string' ? undefined : data.receiverEmail
-  const phone = typeof data === 'string' ? undefined : data.receiverPhone
+  // Deployed Supabase may only have 2-param function (p_gift_token, p_receiver_address).
+  // Call with only those so it works without running the 5-param migration.
   const { data: result, error } = await supabase.rpc('confirm_gift_receiver', {
     p_gift_token: giftToken,
     p_receiver_address: address,
-    p_receiver_name: name ?? null,
-    p_receiver_email: email ?? null,
-    p_receiver_phone: phone ?? null,
   })
   if (error) throw error
   return result as Record<string, unknown>

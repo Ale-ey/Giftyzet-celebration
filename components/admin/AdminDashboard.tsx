@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState, useCallback } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useRouter } from "next/navigation"
 import {
   Store,
   CheckCircle2,
@@ -19,6 +19,7 @@ import {
   DollarSign,
   EyeOff,
   Copy,
+  ChevronDown,
 } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -32,6 +33,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { useToast } from "@/components/ui/toast"
 import { getCurrentUserWithProfile } from "@/lib/api/auth"
 import { supabase } from "@/lib/supabase/client"
@@ -152,7 +159,6 @@ export default function AdminDashboard() {
   const [selectedPayoutIds, setSelectedPayoutIds] = useState<Set<string>>(new Set())
   const [processPayoutsLoading, setProcessPayoutsLoading] = useState(false)
   const [showProcessPayoutsConfirm, setShowProcessPayoutsConfirm] = useState(false)
-  const searchParams = useSearchParams()
   const [payoutMessage, setPayoutMessage] = useState<string | null>(null)
 
   const [giftingVideoUrl, setGiftingVideoUrl] = useState("")
@@ -161,6 +167,13 @@ export default function AdminDashboard() {
   const [overviewVideosSaving, setOverviewVideosSaving] = useState(false)
   const [showConfirmSettingsModal, setShowConfirmSettingsModal] = useState(false)
   const { showToast } = useToast()
+
+  // Local state for payouts filters (no Next.js searchParams hook)
+  const [payoutsPage, setPayoutsPage] = useState(1)
+  const [payoutsSearch, setPayoutsSearch] = useState("")
+  const [payoutsStoreName, setPayoutsStoreName] = useState("")
+  const [payoutsVendorName, setPayoutsVendorName] = useState("")
+  const [payoutsStatus, setPayoutsStatus] = useState<"all" | "pending" | "paid" | "failed">("all")
 
   const [pluginOrders, setPluginOrders] = useState<PluginOrderRow[]>([])
   const [pluginOrdersTotal, setPluginOrdersTotal] = useState(0)
@@ -267,39 +280,30 @@ export default function AdminDashboard() {
     fetchQueries()
   }, [isAuthorized, activeTab])
 
-  const payoutsPage = Math.max(1, parseInt(searchParams.get("payout_page") || "1", 10))
-  const payoutsSearch = searchParams.get("payout_search") || ""
-  const payoutsStoreName = searchParams.get("payout_store") || ""
-  const payoutsVendorName = searchParams.get("payout_vendor") || ""
-  const payoutsStatus = (searchParams.get("payout_status") || "all") as "all" | "pending" | "paid" | "failed"
-
   const setPayoutsParams = useCallback(
     (updates: { page?: number; search?: string; store_name?: string; vendor_name?: string; status?: string }) => {
-      const params = new URLSearchParams(searchParams.toString())
-      if (updates.page !== undefined) params.set("payout_page", String(updates.page))
+      if (updates.page !== undefined) {
+        setPayoutsPage(Math.max(1, updates.page))
+      }
       if (updates.search !== undefined) {
-        if (updates.search) params.set("payout_search", updates.search)
-        else params.delete("payout_search")
-        params.set("payout_page", "1")
+        setPayoutsSearch(updates.search)
+        setPayoutsPage(1)
       }
       if (updates.store_name !== undefined) {
-        if (updates.store_name) params.set("payout_store", updates.store_name)
-        else params.delete("payout_store")
-        params.set("payout_page", "1")
+        setPayoutsStoreName(updates.store_name)
+        setPayoutsPage(1)
       }
       if (updates.vendor_name !== undefined) {
-        if (updates.vendor_name) params.set("payout_vendor", updates.vendor_name)
-        else params.delete("payout_vendor")
-        params.set("payout_page", "1")
+        setPayoutsVendorName(updates.vendor_name)
+        setPayoutsPage(1)
       }
       if (updates.status !== undefined) {
-        if (updates.status && updates.status !== "all") params.set("payout_status", updates.status)
-        else params.delete("payout_status")
-        params.set("payout_page", "1")
+        const status = (updates.status || "all") as "all" | "pending" | "paid" | "failed"
+        setPayoutsStatus(status)
+        setPayoutsPage(1)
       }
-      router.push(`/admin?${params.toString()}`, { scroll: false })
     },
-    [router, searchParams]
+    []
   )
 
   useEffect(() => {
@@ -788,73 +792,54 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-slate-50">
       <div className="container mx-auto px-4 py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Admin Dashboard</h1>
           <p className="text-gray-600">Manage vendors, stores, and platform settings</p>
         </div>
 
-        {/* Stats cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
-          <Card className="border border-gray-200 bg-white">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-gray-600">Total Stores</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-gray-900">{totalStores}</div>
-            </CardContent>
-          </Card>
-          <Card className="border border-gray-200 bg-white">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-gray-600">Pending Approvals</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-yellow-600">{pendingCount}</div>
-            </CardContent>
-          </Card>
-          <Card className="border border-gray-200 bg-white">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-gray-600">Total Orders</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-gray-900">{totalOrders}</div>
-            </CardContent>
-          </Card>
-          <Card className="border border-gray-200 bg-white">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-gray-600">Suspended Stores</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-red-600">{suspendedCount}</div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Tabs */}
-        <div className="border-b border-gray-200 mb-6">
-          <nav className="flex gap-1" aria-label="Tabs">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium rounded-t-lg border-b-2 transition-colors ${
-                  activeTab === tab.id
-                    ? "border-primary text-primary bg-primary/5"
-                    : "border-transparent text-gray-600 hover:text-gray-900 hover:bg-gray-50"
-                }`}
-              >
-                {tab.icon}
-                {tab.label}
-              </button>
-            ))}
-          </nav>
-        </div>
+        {/* Stats cards – only on Stores tab */}
+        {activeTab === "stores" && (
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+            <Card className="border border-gray-100 bg-white rounded-xl shadow-sm">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium text-gray-600">Total Stores</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-gray-900">{totalStores}</div>
+              </CardContent>
+            </Card>
+            <Card className="border border-gray-100 bg-white rounded-xl shadow-sm">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium text-gray-600">Pending Approvals</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-yellow-600">{pendingCount}</div>
+              </CardContent>
+            </Card>
+            <Card className="border border-gray-100 bg-white rounded-xl shadow-sm">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium text-gray-600">Total Orders</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-gray-900">{totalOrders}</div>
+              </CardContent>
+            </Card>
+            <Card className="border border-gray-100 bg-white rounded-xl shadow-sm">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium text-gray-600">Suspended Stores</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-red-600">{suspendedCount}</div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
         {/* Tab: Stores */}
         {activeTab === "stores" && (
-          <Card className="border border-gray-200 bg-white">
+          <Card className="border border-gray-100 bg-white rounded-xl shadow-sm">
             <CardHeader>
               <CardTitle className="text-gray-900">Stores</CardTitle>
               <CardDescription className="text-gray-600">
@@ -862,16 +847,40 @@ export default function AdminDashboard() {
               </CardDescription>
               <div className="flex flex-wrap items-center gap-3 pt-2">
                 <span className="text-sm text-gray-600">Filter by status:</span>
-                <select
-                  value={storeStatusFilter}
-                  onChange={(e) => setStoreStatusFilter(e.target.value as StoreStatusFilter)}
-                  className="border border-gray-200 rounded-md px-3 py-1.5 text-sm bg-white text-gray-900"
-                >
-                  <option value="all">All</option>
-                  <option value="pending">Pending</option>
-                  <option value="approved">Approved</option>
-                  <option value="suspended">Suspended</option>
-                </select>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-9 min-w-[160px] justify-between rounded-md border border-gray-300 bg-white px-3 text-sm font-normal text-gray-900 hover:bg-primary/10 hover:text-primary"
+                    >
+                      <span>
+                        {storeStatusFilter === "all"
+                          ? "All stores"
+                          : storeStatusFilter === "pending"
+                          ? "Pending"
+                          : storeStatusFilter === "approved"
+                          ? "Approved"
+                          : "Suspended"}
+                      </span>
+                      <ChevronDown className="h-4 w-4 text-gray-500" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="min-w-[160px]">
+                    <DropdownMenuItem onClick={() => setStoreStatusFilter("all")}>
+                      All stores
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setStoreStatusFilter("pending")}>
+                      Pending
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setStoreStatusFilter("approved")}>
+                      Approved
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setStoreStatusFilter("suspended")}>
+                      Suspended
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             </CardHeader>
             <CardContent>
@@ -997,7 +1006,7 @@ export default function AdminDashboard() {
         {/* Tab: Commission (Platform service & Plugin service) */}
         {activeTab === "commission" && (
           <div className="space-y-6">
-            <Card className="border border-gray-200 bg-white">
+            <Card className="border border-gray-100 bg-white rounded-xl shadow-sm">
               <CardHeader>
                 <CardTitle className="text-gray-900 flex items-center gap-2">
                   <Percent className="h-5 w-5" />
@@ -1054,7 +1063,7 @@ export default function AdminDashboard() {
               </CardContent>
             </Card>
 
-            <Card className="border border-gray-200 bg-white">
+            <Card className="border border-gray-100 bg-white rounded-xl shadow-sm">
               <CardHeader>
                 <CardTitle className="text-gray-900 flex items-center gap-2">
                   <Video className="h-5 w-5" />
@@ -1137,7 +1146,7 @@ export default function AdminDashboard() {
 
         {/* Tab: Contact Queries */}
         {activeTab === "queries" && (
-          <Card className="border border-gray-200 bg-white">
+          <Card className="border border-gray-100 bg-white rounded-xl shadow-sm">
             <CardHeader>
               <CardTitle className="text-gray-900 flex items-center gap-2">
                 <MessageSquare className="h-5 w-5" />
@@ -1197,7 +1206,7 @@ export default function AdminDashboard() {
 
         {/* Tab: Plugin Queries */}
         {activeTab === "pluginQueries" && (
-          <Card className="border border-gray-200 bg-white">
+          <Card className="border border-gray-100 bg-white rounded-xl shadow-sm">
             <CardHeader>
               <CardTitle className="text-gray-900 flex items-center gap-2">
                 <Plug className="h-5 w-5" />
@@ -1259,7 +1268,7 @@ export default function AdminDashboard() {
 
         {/* Tab: Plugin Orders */}
         {activeTab === "pluginOrders" && (
-          <Card className="border border-gray-200 bg-white">
+          <Card className="border border-gray-100 bg-white rounded-xl shadow-sm">
             <CardHeader>
               <CardTitle className="text-gray-900 flex items-center gap-2">
                 <Plug className="h-5 w-5" />
@@ -1269,21 +1278,72 @@ export default function AdminDashboard() {
                 Orders created via the Plugin API from external selling platforms. Commission and plugin fee are charged from the seller.
               </CardDescription>
               <div className="flex flex-wrap items-center gap-3 pt-2">
-                <select
-                  value={pluginOrdersStatus}
-                  onChange={(e) => {
-                    setPluginOrdersStatus(e.target.value)
-                    setPluginOrdersPage(1)
-                  }}
-                  className="h-9 rounded-md border border-gray-200 px-3 text-sm text-gray-700 bg-white"
-                >
-                  <option value="all">Status: All</option>
-                  <option value="pending">Pending</option>
-                  <option value="confirmed">Confirmed</option>
-                  <option value="dispatched">Dispatched</option>
-                  <option value="delivered">Delivered</option>
-                  <option value="cancelled">Cancelled</option>
-                </select>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-9 min-w-[170px] justify-between rounded-md border border-gray-300 bg-white px-3 text-sm font-normal text-gray-900 hover:bg-primary/10 hover:text-primary"
+                    >
+                      <span>
+                        {pluginOrdersStatus === "all"
+                          ? "Status: All"
+                          : `Status: ${pluginOrdersStatus.charAt(0).toUpperCase()}${pluginOrdersStatus.slice(1)}`}
+                      </span>
+                      <ChevronDown className="h-4 w-4 text-gray-500" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="min-w-[170px]">
+                    <DropdownMenuItem
+                      onClick={() => {
+                        setPluginOrdersStatus("all")
+                        setPluginOrdersPage(1)
+                      }}
+                    >
+                      All
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => {
+                        setPluginOrdersStatus("pending")
+                        setPluginOrdersPage(1)
+                      }}
+                    >
+                      Pending
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => {
+                        setPluginOrdersStatus("confirmed")
+                        setPluginOrdersPage(1)
+                      }}
+                    >
+                      Confirmed
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => {
+                        setPluginOrdersStatus("dispatched")
+                        setPluginOrdersPage(1)
+                      }}
+                    >
+                      Dispatched
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => {
+                        setPluginOrdersStatus("delivered")
+                        setPluginOrdersPage(1)
+                      }}
+                    >
+                      Delivered
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => {
+                        setPluginOrdersStatus("cancelled")
+                        setPluginOrdersPage(1)
+                      }}
+                    >
+                      Cancelled
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             </CardHeader>
             <CardContent>
@@ -1299,19 +1359,16 @@ export default function AdminDashboard() {
               ) : (
                 <>
                   <div className="overflow-x-auto -mx-4 sm:mx-0">
-                    <table className="w-full border-collapse min-w-[900px]">
+                    <table className="w-full border-collapse min-w-[820px]">
                       <thead>
                         <tr className="border-b border-gray-200">
                           <th className="text-left py-3 px-4 text-sm font-semibold text-gray-900">Order #</th>
-                          <th className="text-left py-3 px-4 text-sm font-semibold text-gray-900">External ID</th>
-                          <th className="text-left py-3 px-4 text-sm font-semibold text-gray-900">Integration</th>
                           <th className="text-left py-3 px-4 text-sm font-semibold text-gray-900">Store</th>
                           <th className="text-left py-3 px-4 text-sm font-semibold text-gray-900">Store (back)</th>
                           <th className="text-left py-3 px-4 text-sm font-semibold text-gray-900">Store Stripe</th>
                           <th className="text-left py-3 px-4 text-sm font-semibold text-gray-900">Vendor</th>
                           <th className="text-left py-3 px-4 text-sm font-semibold text-gray-900">Status</th>
                           <th className="text-right py-3 px-4 text-sm font-semibold text-gray-900">Total</th>
-                          <th className="text-right py-3 px-4 text-sm font-semibold text-gray-900">Commission</th>
                           <th className="text-right py-3 px-4 text-sm font-semibold text-gray-900">Plugin fee</th>
                           <th className="text-right py-3 px-4 text-sm font-semibold text-gray-900">Vendor amount</th>
                           <th className="text-left py-3 px-4 text-sm font-semibold text-gray-900">Created</th>
@@ -1321,8 +1378,6 @@ export default function AdminDashboard() {
                         {pluginOrders.map((row) => (
                           <tr key={row.id} className="border-b border-gray-100 hover:bg-gray-50/50">
                             <td className="py-3 px-4 text-sm font-medium text-gray-900">{row.order_number}</td>
-                            <td className="py-3 px-4 text-sm text-gray-600">{row.external_order_id || "—"}</td>
-                            <td className="py-3 px-4 text-sm text-gray-600">{row.integration_name}</td>
                             <td className="py-3 px-4 text-sm text-gray-600">{row.store_name}</td>
                             <td className="py-3 px-4 text-sm text-gray-600 max-w-[220px]">
                               {(row.store_back_name || row.store_back_email || row.store_back_phone || row.store_back_iban) ? (
@@ -1368,10 +1423,6 @@ export default function AdminDashboard() {
                             </td>
                             <td className="py-3 px-4 text-sm font-medium text-gray-900 text-right">
                               ${row.total.toFixed(2)}
-                            </td>
-                            <td className="py-3 px-4 text-sm text-gray-600 text-right">
-                              ${row.commission_amount.toFixed(2)}
-                              <span className="text-xs text-gray-400 ml-1">({row.commission_percent}%)</span>
                             </td>
                             <td className="py-3 px-4 text-sm text-gray-600 text-right">
                               ${row.plugin_fee.toFixed(2)}
@@ -1420,7 +1471,7 @@ export default function AdminDashboard() {
 
         {/* Tab: Plugin API Keys */}
         {activeTab === "pluginIntegrations" && (
-          <Card className="border border-gray-200 bg-white">
+          <Card className="border border-gray-100 bg-white rounded-xl shadow-sm">
             <CardHeader>
               <CardTitle className="text-gray-900 flex items-center gap-2">
                 <Plug className="h-5 w-5" />
@@ -1515,7 +1566,7 @@ export default function AdminDashboard() {
 
         {/* Tab: Payouts */}
         {activeTab === "payouts" && (
-          <Card className="border border-gray-200 bg-white">
+          <Card className="border border-gray-100 bg-white rounded-xl shadow-sm">
             <CardHeader>
               <CardTitle className="text-gray-900 flex items-center gap-2">
                 <Wallet className="h-5 w-5" />
@@ -1543,16 +1594,36 @@ export default function AdminDashboard() {
                   onChange={(e) => setPayoutsParams({ vendor_name: e.target.value })}
                   className="max-w-[180px] h-9"
                 />
-                <select
-                  value={payoutsStatus}
-                  onChange={(e) => setPayoutsParams({ status: e.target.value })}
-                  className="h-9 rounded-md border border-gray-200 px-3 text-sm text-gray-700 bg-white"
-                >
-                  <option value="all">Status: All</option>
-                  <option value="pending">Pending</option>
-                  <option value="paid">Paid</option>
-                  <option value="failed">Failed</option>
-                </select>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-9 min-w-[170px] justify-between rounded-md border border-gray-300 bg-white px-3 text-sm font-normal text-gray-900 hover:bg-primary/10 hover:text-primary"
+                    >
+                      <span>
+                        {payoutsStatus === "all"
+                          ? "Status: All"
+                          : `Status: ${payoutsStatus.charAt(0).toUpperCase()}${payoutsStatus.slice(1)}`}
+                      </span>
+                      <ChevronDown className="h-4 w-4 text-gray-500" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="min-w-[170px]">
+                    <DropdownMenuItem onClick={() => setPayoutsParams({ status: "all" })}>
+                      All
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setPayoutsParams({ status: "pending" })}>
+                      Pending
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setPayoutsParams({ status: "paid" })}>
+                      Paid
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setPayoutsParams({ status: "failed" })}>
+                      Failed
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
                 <Button
                   onClick={() => setShowProcessPayoutsConfirm(true)}
                   disabled={processPayoutsLoading || payablesPayouts.length === 0 || selectedPayoutIds.size === 0}

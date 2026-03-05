@@ -236,7 +236,7 @@ export default function VendorProductsPage() {
                 setIsServiceDialogOpen(true)
               }
             }}
-            className="border-2 border-gray-300 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-400"
+            className="border-2 border-primary/40 bg-white text-primary hover:bg-primary/5 hover:border-primary/60"
           >
             <Plus className="h-4 w-4 mr-2" />
             Add {activeTab === "products" ? "Product" : "Service"}
@@ -263,7 +263,7 @@ export default function VendorProductsPage() {
                       </p>
                       <Button
                         onClick={() => setIsProductDialogOpen(true)}
-                        className="border-2 border-gray-300 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-400"
+                        className="border-2 border-primary/40 bg-white text-primary hover:bg-primary/5 hover:border-primary/60"
                       >
                         <Plus className="h-4 w-4 mr-2" />
                         Add First Product
@@ -272,57 +272,59 @@ export default function VendorProductsPage() {
                   </Card>
                 ) : (
                   paginatedProducts.map((product) => (
-                <Card key={product.id} className="border border-gray-200 bg-white">
-                  <div className="aspect-square overflow-hidden rounded-t-lg bg-gray-100">
-                    {product.image_url ? (
-                    <img
-                        src={product.image_url}
-                      alt={product.name}
-                      className="w-full h-full object-cover"
-                    />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center bg-gray-200">
-                        <Package className="h-16 w-16 text-gray-400" />
+                    <Card key={product.id} className="border border-gray-200 bg-white rounded-lg overflow-hidden">
+                      <div className="h-40 sm:h-44 overflow-hidden bg-gray-100">
+                        {product.image_url ? (
+                          <img
+                            src={product.image_url}
+                            alt={product.name}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center bg-gray-200">
+                            <Package className="h-10 w-10 text-gray-400" />
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                  <CardHeader>
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <CardTitle className="text-gray-900">{product.name}</CardTitle>
-                        <CardDescription className="text-gray-600">
-                          ${product.price} • {product.category}
-                        </CardDescription>
-                      </div>
-                      <Badge className={product.available !== false ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}>
-                        {product.available !== false ? "Available" : "Unavailable"}
-                      </Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleEditProduct(product)}
-                        disabled={actionLoading}
-                        className="flex-1 border-gray-200 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-                      >
-                        <Edit className="h-4 w-4 mr-1" />
-                        Edit
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleDeleteClick(product.id, product.name, "product")}
-                        disabled={actionLoading}
-                        className="border-gray-200 bg-white text-gray-700 hover:bg-gray-50 hover:text-red-600 disabled:opacity-50"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
+                      <CardHeader className="p-4 pb-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <CardTitle className="text-gray-900 text-sm truncate">
+                              {product.name}
+                            </CardTitle>
+                            <CardDescription className="text-gray-600 text-xs mt-1 truncate">
+                              ${product.price} • {product.category}
+                            </CardDescription>
+                          </div>
+                          <Badge className={product.available !== false ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}>
+                            {product.available !== false ? "Available" : "Unavailable"}
+                          </Badge>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="p-4 pt-2">
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleEditProduct(product)}
+                            disabled={actionLoading}
+                            className="flex-1 border-gray-200 bg-white text-gray-900 hover:bg-primary/10 hover:text-primary disabled:opacity-50"
+                          >
+                            <Edit className="h-4 w-4 mr-1" />
+                            Edit
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDeleteClick(product.id, product.name, "product")}
+                            disabled={actionLoading}
+                            className="border-gray-200 bg-white text-gray-700 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
                   ))
                 )}
               </div>
@@ -361,7 +363,7 @@ export default function VendorProductsPage() {
                       </p>
                       <Button
                         onClick={() => setIsServiceDialogOpen(true)}
-                        className="border-2 border-gray-300 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-400"
+                        className="border-2 border-primary/40 bg-white text-primary hover:bg-primary/5 hover:border-primary/60"
                       >
                         <Plus className="h-4 w-4 mr-2" />
                         Add First Service
@@ -370,57 +372,59 @@ export default function VendorProductsPage() {
                   </Card>
                 ) : (
                   paginatedServices.map((service) => (
-                <Card key={service.id} className="border border-gray-200 bg-white">
-                  <div className="aspect-square overflow-hidden rounded-t-lg bg-gray-100">
-                    {service.image_url ? (
-                    <img
-                        src={service.image_url}
-                      alt={service.name}
-                      className="w-full h-full object-cover"
-                    />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center bg-gray-200">
-                        <Wrench className="h-16 w-16 text-gray-400" />
+                    <Card key={service.id} className="border border-gray-200 bg-white rounded-lg overflow-hidden">
+                      <div className="h-40 sm:h-44 overflow-hidden bg-gray-100">
+                        {service.image_url ? (
+                          <img
+                            src={service.image_url}
+                            alt={service.name}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center bg-gray-200">
+                            <Wrench className="h-10 w-10 text-gray-400" />
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                  <CardHeader>
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <CardTitle className="text-gray-900">{service.name}</CardTitle>
-                        <CardDescription className="text-gray-600">
-                          ${service.price} • {service.category}
-                        </CardDescription>
-                      </div>
-                      <Badge className={service.available !== false ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}>
-                        {service.available !== false ? "Available" : "Unavailable"}
-                      </Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleEditService(service)}
-                        disabled={actionLoading}
-                        className="flex-1 border-gray-200 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-                      >
-                        <Edit className="h-4 w-4 mr-1" />
-                        Edit
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleDeleteClick(service.id, service.name, "service")}
-                        disabled={actionLoading}
-                        className="border-gray-200 bg-white text-gray-700 hover:bg-gray-50 hover:text-red-600 disabled:opacity-50"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
+                      <CardHeader className="p-4 pb-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <CardTitle className="text-gray-900 text-sm truncate">
+                              {service.name}
+                            </CardTitle>
+                            <CardDescription className="text-gray-600 text-xs mt-1 truncate">
+                              ${service.price} • {service.category}
+                            </CardDescription>
+                          </div>
+                          <Badge className={service.available !== false ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}>
+                            {service.available !== false ? "Available" : "Unavailable"}
+                          </Badge>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="p-4 pt-2">
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleEditService(service)}
+                            disabled={actionLoading}
+                            className="flex-1 border-gray-200 bg-white text-gray-900 hover:bg-primary/10 hover:text-primary disabled:opacity-50"
+                          >
+                            <Edit className="h-4 w-4 mr-1" />
+                            Edit
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDeleteClick(service.id, service.name, "service")}
+                            disabled={actionLoading}
+                            className="border-gray-200 bg-white text-gray-700 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
                   ))
                 )}
               </div>

@@ -2,11 +2,17 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { ArrowLeft, CheckCircle2, Truck, Package, Clock, XCircle } from "lucide-react"
+import { ArrowLeft, CheckCircle2, Truck, Package, Clock, XCircle, ChevronDown } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Pagination } from "@/components/ui/pagination"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { getCurrentUserWithProfile } from "@/lib/api/auth"
 import { getOrdersByVendorId, updateVendorOrderStatus } from "@/lib/api/orders"
 import { useToast } from "@/components/ui/toast"
@@ -234,19 +240,48 @@ export default function VendorOrdersPage() {
 
         {/* Filter dropdown */}
         <div className="flex items-center gap-4 mb-6">
-          <label htmlFor="status-filter" className="text-sm font-medium text-gray-700">Filter by status:</label>
-          <select
-            id="status-filter"
-            value={filter}
-            onChange={(e) => handleFilterChange(e.target.value)}
-            className="rounded-md border border-gray-200 bg-white px-3 py-2 text-gray-900 shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary min-w-[160px]"
-          >
-            {statusOptions.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label} {opt.value === "all" ? `(${orders.length})` : `(${orders.filter((o) => o.status === opt.value).length})`}
-              </option>
-            ))}
-          </select>
+          <span className="text-sm text-gray-600">Filter by status:</span>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                className="flex items-center gap-2 rounded-md border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-900 hover:bg-primary/10 hover:text-primary shadow-sm min-w-[180px] justify-between"
+              >
+                <span>
+                  {statusOptions.find((o) => o.value === filter)?.label || "All"}{" "}
+                  <span className="text-xs text-gray-500">
+                    (
+                    {filter === "all"
+                      ? orders.length
+                      : orders.filter((o) => o.status?.toLowerCase() === filter.toLowerCase()).length}
+                    )
+                  </span>
+                </span>
+                <ChevronDown className="h-4 w-4 opacity-70" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="min-w-[200px]">
+              {statusOptions.map((opt) => {
+                const count =
+                  opt.value === "all"
+                    ? orders.length
+                    : orders.filter((o) => o.status?.toLowerCase() === opt.value.toLowerCase()).length
+                const active = filter === opt.value
+                return (
+                  <DropdownMenuItem
+                    key={opt.value}
+                    onClick={() => handleFilterChange(opt.value)}
+                    className={active ? "bg-primary/5 text-primary" : ""}
+                  >
+                    <div className="flex w-full items-center justify-between">
+                      <span>{opt.label}</span>
+                      <span className="text-xs text-gray-500">{count}</span>
+                    </div>
+                  </DropdownMenuItem>
+                )
+              })}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
         {/* Orders Table */}
@@ -312,24 +347,35 @@ export default function VendorOrdersPage() {
                       </td>
                       <td className="px-4 py-3 font-semibold text-gray-900">${order.total.toFixed(2)}</td>
                       <td className="px-4 py-3">
-                        <select
-                          value={order.status}
-                          onChange={(e) => {
-                            e.stopPropagation()
-                            const newStatus = e.target.value
-                            if (newStatus !== order.status) {
-                              handleStatusUpdate(order.id, newStatus)
-                            }
-                          }}
-                          onClick={(e) => e.stopPropagation()}
-                          className="rounded border border-gray-200 bg-white px-2 py-1.5 text-sm text-gray-900 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                        >
-                          <option value="pending">Pending</option>
-                          <option value="confirmed">Confirmed</option>
-                          <option value="dispatched">Dispatched</option>
-                          <option value="delivered">Delivered</option>
-                          <option value="cancelled">Cancelled</option>
-                        </select>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="flex items-center justify-between gap-1 rounded-md border border-gray-200 bg-white px-2 py-1.5 text-xs font-medium text-gray-900 hover:bg-primary/10 hover:text-primary w-[140px]"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <span className="truncate capitalize">{order.status || "pending"}</span>
+                              <ChevronDown className="h-3 w-3 opacity-70" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="start" className="min-w-[160px]">
+                            {["pending", "confirmed", "dispatched", "delivered", "cancelled"].map((status) => (
+                              <DropdownMenuItem
+                                key={status}
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  if (status !== order.status) {
+                                    handleStatusUpdate(order.id, status)
+                                  }
+                                }}
+                                className={order.status === status ? "bg-primary/5 text-primary capitalize" : "capitalize"}
+                              >
+                                {status}
+                              </DropdownMenuItem>
+                            ))}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </td>
                       <td className="px-4 py-3">
                         <Button

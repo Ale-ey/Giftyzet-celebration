@@ -285,7 +285,14 @@ export default function VendorOrdersPage() {
                       className="border-b border-gray-100 hover:bg-gray-50/50"
                     >
                       <td className="px-4 py-3">
-                        <span className="font-medium text-gray-900">{order.orderNumber}</span>
+                        <div className="flex flex-col gap-1">
+                          <span className="font-medium text-gray-900">{order.orderNumber}</span>
+                          {order.orderType === "plugin" && (
+                            <Badge className="self-start bg-purple-50 text-purple-700 border-purple-200 text-xs">
+                              Plugin order
+                            </Badge>
+                          )}
+                        </div>
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-600">
                         {order.customerName}

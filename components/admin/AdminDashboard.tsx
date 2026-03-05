@@ -17,6 +17,8 @@ import {
   Plug,
   Wallet,
   DollarSign,
+  EyeOff,
+  Copy,
 } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -40,7 +42,7 @@ import {
 } from "@/lib/api/vendors"
 import type { Order } from "@/types"
 
-type TabId = "stores" | "commission" | "queries" | "pluginQueries" | "payouts" | "pluginOrders"
+type TabId = "stores" | "commission" | "queries" | "pluginQueries" | "payouts" | "pluginOrders" | "pluginIntegrations"
 type StoreStatusFilter = "all" | "pending" | "approved" | "suspended"
 
 interface ContactSubmission {
@@ -73,6 +75,12 @@ interface PayoutRow {
   delivered_at: string
   status: "pending" | "paid" | "failed"
   paid_at?: string
+  /** Present for pending/failed: true = admin can pay to vendor Stripe account */
+  has_stripe_account?: boolean
+   /** True if this payout row is from a plugin order */
+  is_plugin_order?: boolean
+  /** Plugin store Stripe account ID (if provided on the order) */
+  plugin_store_stripe_account_id?: string | null
 }
 
 interface PluginOrderRow {
@@ -82,6 +90,11 @@ interface PluginOrderRow {
   store_name: string
   vendor_name: string
   integration_name: string
+  store_back_name: string | null
+  store_back_email: string | null
+  store_back_phone: string | null
+  store_back_iban: string | null
+  store_back_stripe_account_id: string | null
   status: string
   payment_status: string
   total: number
@@ -91,6 +104,18 @@ interface PluginOrderRow {
   vendor_amount: number
   created_at: string
   confirmed_at: string | null
+}
+
+interface PluginIntegrationRow {
+  id: string
+  name: string
+  store_id: string
+  store_name: string | null
+  fee_per_order: number
+  api_key_prefix: string
+  api_key_plain: string | null
+  is_active: boolean
+  created_at: string
 }
 
 export default function AdminDashboard() {
@@ -143,6 +168,11 @@ export default function AdminDashboard() {
   const [pluginOrdersError, setPluginOrdersError] = useState<string | null>(null)
   const [pluginOrdersPage, setPluginOrdersPage] = useState(1)
   const [pluginOrdersStatus, setPluginOrdersStatus] = useState<string>("all")
+
+  const [pluginIntegrations, setPluginIntegrations] = useState<PluginIntegrationRow[]>([])
+  const [pluginIntegrationsLoading, setPluginIntegrationsLoading] = useState(false)
+  const [pluginIntegrationsError, setPluginIntegrationsError] = useState<string | null>(null)
+  const [pluginIntegrationKeyVisible, setPluginIntegrationKeyVisible] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -367,6 +397,44 @@ export default function AdminDashboard() {
     }
     fetchPluginOrders()
   }, [isAuthorized, activeTab, pluginOrdersPage, pluginOrdersStatus])
+
+  useEffect(() => {
+    if (!isAuthorized || activeTab !== "pluginIntegrations") return
+    const fetchIntegrations = async () => {
+      setPluginIntegrationsLoading(true)
+      setPluginIntegrationsError(null)
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        const res = await fetch("/api/admin/plugin-integrations", {
+          headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {},
+        })
+        const data = await res.json()
+        if (!res.ok) {
+          setPluginIntegrationsError(data.error || "Failed to load plugin integrations")
+          setPluginIntegrations([])
+          return
+        }
+        const list = (data.integrations || []).map((i: any) => ({
+          id: i.id,
+          name: i.name || "—",
+          store_id: i.store_id,
+          store_name: i.stores?.name ?? (approvedStores.find((s: any) => s.id === i.store_id)?.name) ?? null,
+          fee_per_order: Number(i.fee_per_order) || 0,
+          api_key_prefix: i.api_key_prefix || "",
+          api_key_plain: i.api_key_plain ? String(i.api_key_plain) : null,
+          is_active: Boolean(i.is_active),
+          created_at: i.created_at || "",
+        }))
+        setPluginIntegrations(list)
+      } catch (e) {
+        setPluginIntegrationsError("Failed to load plugin integrations")
+        setPluginIntegrations([])
+      } finally {
+        setPluginIntegrationsLoading(false)
+      }
+    }
+    fetchIntegrations()
+  }, [isAuthorized, activeTab, approvedStores])
 
   const loadStoresData = async () => {
     try {
@@ -598,6 +666,7 @@ export default function AdminDashboard() {
     { id: "commission", label: "Tax & Plugin", icon: <Percent className="h-4 w-4" /> },
     { id: "payouts", label: "Payouts", icon: <Wallet className="h-4 w-4" /> },
     { id: "pluginOrders", label: "Plugin Orders", icon: <Plug className="h-4 w-4" /> },
+    { id: "pluginIntegrations", label: "Plugin API Keys", icon: <Plug className="h-4 w-4" /> },
     { id: "queries", label: "Contact Queries", icon: <MessageSquare className="h-4 w-4" /> },
     { id: "pluginQueries", label: "Plugin Queries", icon: <Plug className="h-4 w-4" /> },
   ]
@@ -609,6 +678,44 @@ export default function AdminDashboard() {
       else next.add(id)
       return next
     })
+  }
+
+  const togglePluginKeyVisible = (id: string) => {
+    setPluginIntegrationKeyVisible((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const handleDeletePluginIntegration = async (id: string) => {
+    if (typeof window !== "undefined" && !window.confirm("Delete this API key? The store will no longer be able to use this integration.")) {
+      return
+    }
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch(`/api/admin/plugin-integrations?integration_id=${encodeURIComponent(id)}`, {
+        method: "DELETE",
+        headers: {
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        showToast(data.error || "Failed to delete integration", "error")
+        return
+      }
+      setPluginIntegrations((prev) => prev.filter((row) => row.id !== id))
+      showToast("Integration deleted.", "success")
+    } catch (e) {
+      console.error("Delete plugin integration error:", e)
+      showToast("Failed to delete integration", "error")
+    }
+  }
+
+  const copyPluginApiKey = (key: string) => {
+    navigator.clipboard.writeText(key).then(() => showToast("API key copied to clipboard", "success")).catch(() => showToast("Copy failed", "error"))
   }
 
   const payablesPayouts = payouts.filter((p) => p.status === "pending" || p.status === "failed")
@@ -1199,6 +1306,8 @@ export default function AdminDashboard() {
                           <th className="text-left py-3 px-4 text-sm font-semibold text-gray-900">External ID</th>
                           <th className="text-left py-3 px-4 text-sm font-semibold text-gray-900">Integration</th>
                           <th className="text-left py-3 px-4 text-sm font-semibold text-gray-900">Store</th>
+                          <th className="text-left py-3 px-4 text-sm font-semibold text-gray-900">Store (back)</th>
+                          <th className="text-left py-3 px-4 text-sm font-semibold text-gray-900">Store Stripe</th>
                           <th className="text-left py-3 px-4 text-sm font-semibold text-gray-900">Vendor</th>
                           <th className="text-left py-3 px-4 text-sm font-semibold text-gray-900">Status</th>
                           <th className="text-right py-3 px-4 text-sm font-semibold text-gray-900">Total</th>
@@ -1215,6 +1324,31 @@ export default function AdminDashboard() {
                             <td className="py-3 px-4 text-sm text-gray-600">{row.external_order_id || "—"}</td>
                             <td className="py-3 px-4 text-sm text-gray-600">{row.integration_name}</td>
                             <td className="py-3 px-4 text-sm text-gray-600">{row.store_name}</td>
+                            <td className="py-3 px-4 text-sm text-gray-600 max-w-[220px]">
+                              {(row.store_back_name || row.store_back_email || row.store_back_phone || row.store_back_iban) ? (
+                                <span className="block">
+                                  {row.store_back_name && <span className="font-medium block">{row.store_back_name}</span>}
+                                  {row.store_back_email && <a href={`mailto:${row.store_back_email}`} className="text-primary hover:underline block truncate">{row.store_back_email}</a>}
+                                  {row.store_back_phone && <span className="text-xs block">{row.store_back_phone}</span>}
+                                  {row.store_back_iban && <span className="text-xs font-mono block truncate" title={row.store_back_iban}>IBAN: {row.store_back_iban}</span>}
+                                </span>
+                              ) : "—"}
+                            </td>
+                            <td className="py-3 px-4 text-sm">
+                              {row.store_back_stripe_account_id ? (
+                                <Badge
+                                  variant="outline"
+                                  className="border-green-200 bg-green-50 text-green-700"
+                                  title={`Store provided Stripe account for plugin checkout: ${row.store_back_stripe_account_id}`}
+                                >
+                                  Stripe checkout
+                                </Badge>
+                              ) : (
+                                <span className="text-xs text-amber-600" title="No Stripe account provided for this plugin order's store. Use bank details instead.">
+                                  No Stripe
+                                </span>
+                              )}
+                            </td>
                             <td className="py-3 px-4 text-sm text-gray-600">{row.vendor_name}</td>
                             <td className="py-3 px-4">
                               <Badge
@@ -1278,6 +1412,101 @@ export default function AdminDashboard() {
                       </div>
                     </div>
                   )}
+                </>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Tab: Plugin API Keys */}
+        {activeTab === "pluginIntegrations" && (
+          <Card className="border border-gray-200 bg-white">
+            <CardHeader>
+              <CardTitle className="text-gray-900 flex items-center gap-2">
+                <Plug className="h-5 w-5" />
+                Plugin API Keys
+              </CardTitle>
+              <CardDescription className="text-gray-600">
+                View plugin integrations. Each store gets one API key for the Plugin API. Keys are created from the vendor dashboard; from here you can copy or delete existing keys.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {pluginIntegrationsLoading ? (
+                <div className="py-12 text-center text-gray-500">Loading...</div>
+              ) : pluginIntegrationsError ? (
+                <div className="py-12 text-center text-red-600">{pluginIntegrationsError}</div>
+              ) : pluginIntegrations.length === 0 ? (
+                <div className="py-12 text-center text-gray-500 flex flex-col items-center gap-2">
+                  <Plug className="h-12 w-12 text-gray-300" />
+                  <p>No plugin integrations yet. Vendors can create API keys from their dashboard.</p>
+                </div>
+              ) : (
+                <>
+                  <div className="overflow-x-auto mb-6">
+                    <table className="w-full border-collapse min-w-[700px]">
+                      <thead>
+                        <tr className="border-b border-gray-200">
+                          <th className="text-left py-3 px-4 text-sm font-semibold text-gray-900">Name</th>
+                          <th className="text-left py-3 px-4 text-sm font-semibold text-gray-900">Store</th>
+                          <th className="text-right py-3 px-4 text-sm font-semibold text-gray-900">Fee %</th>
+                          <th className="text-left py-3 px-4 text-sm font-semibold text-gray-900">API Key</th>
+                          <th className="text-left py-3 px-4 text-sm font-semibold text-gray-900">Created</th>
+                          <th className="text-left py-3 px-4 text-sm font-semibold text-gray-900">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {pluginIntegrations.map((row) => {
+                          const isVisible = pluginIntegrationKeyVisible.has(row.id)
+                          const keyDisplay = row.api_key_plain
+                            ? (isVisible ? row.api_key_plain : "••••••••••••••••••••••••••••••••")
+                            : "(key not stored)"
+                          return (
+                            <tr key={row.id} className="border-b border-gray-100 hover:bg-gray-50/50">
+                              <td className="py-3 px-4 text-sm font-medium text-gray-900">{row.name}</td>
+                              <td className="py-3 px-4 text-sm text-gray-600">{row.store_name || row.store_id || "—"}</td>
+                              <td className="py-3 px-4 text-sm text-gray-600 text-right">{row.fee_per_order}%</td>
+                              <td className="py-3 px-4 text-sm">
+                                <span className="font-mono text-xs bg-gray-100 px-2 py-1 rounded inline-block max-w-[280px] truncate align-middle" title={isVisible ? row.api_key_plain || undefined : undefined}>
+                                  {keyDisplay}
+                                </span>
+                                {row.api_key_plain && (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={() => togglePluginKeyVisible(row.id)}
+                                      className="ml-2 p-1 rounded hover:bg-gray-200 inline-flex align-middle"
+                                      title={isVisible ? "Hide key" : "Show key"}
+                                    >
+                                      {isVisible ? <EyeOff className="h-4 w-4 text-gray-600" /> : <Eye className="h-4 w-4 text-gray-600" />}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => copyPluginApiKey(row.api_key_plain!)}
+                                      className="ml-1 p-1 rounded hover:bg-gray-200 inline-flex align-middle"
+                                      title="Copy key"
+                                    >
+                                      <Copy className="h-4 w-4 text-gray-600" />
+                                    </button>
+                                  </>
+                                )}
+                              </td>
+                              <td className="py-3 px-4 text-sm text-gray-500 whitespace-nowrap">{formatPayoutDate(row.created_at)}</td>
+                              <td className="py-3 px-4 text-sm">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="bg-white border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300"
+                                  onClick={() => handleDeletePluginIntegration(row.id)}
+                                >
+                                  Delete
+                                </Button>
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
                 </>
               )}
             </CardContent>
@@ -1369,6 +1598,8 @@ export default function AdminDashboard() {
                           <th className="text-left py-3 px-4 text-sm font-semibold text-gray-900">Order total</th>
                           <th className="text-left py-3 px-4 text-sm font-semibold text-gray-900">Commission</th>
                           <th className="text-left py-3 px-4 text-sm font-semibold text-gray-900">Vendor amount</th>
+                          <th className="text-left py-3 px-4 text-sm font-semibold text-gray-900">Stripe</th>
+                          <th className="text-left py-3 px-4 text-sm font-semibold text-gray-900">Plugin checkout</th>
                           <th className="text-left py-3 px-4 text-sm font-semibold text-gray-900">Delivered</th>
                         </tr>
                       </thead>
@@ -1381,8 +1612,9 @@ export default function AdminDashboard() {
                                   type="checkbox"
                                   checked={selectedPayoutIds.has(row.id)}
                                   onChange={() => togglePayoutSelection(row.id)}
-                                  className="rounded border-gray-300"
-                                  aria-label={`Select payout ${row.order_number}`}
+                                  disabled={row.has_stripe_account === false}
+                                  className="rounded border-gray-300 disabled:opacity-50"
+                                  aria-label={row.has_stripe_account === false ? "Vendor has no Stripe account" : `Select payout ${row.order_number}`}
                                 />
                               ) : (
                                 <span className="text-gray-300">—</span>
@@ -1413,6 +1645,37 @@ export default function AdminDashboard() {
                             </td>
                             <td className="py-3 px-4 text-sm font-medium text-primary">
                               ${row.vendor_amount.toFixed(2)}
+                            </td>
+                            <td className="py-3 px-4 text-sm">
+                              {row.status === "paid" ? (
+                                <span className="text-gray-400">—</span>
+                              ) : row.has_stripe_account === true ? (
+                                <span className="text-green-600" title="Vendor Stripe connected – can pay">✓</span>
+                              ) : (
+                                <span className="text-amber-600" title="Vendor must connect Stripe in Store Setup to receive payout">No Stripe</span>
+                              )}
+                            </td>
+                            <td className="py-3 px-4 text-sm">
+                              {row.is_plugin_order ? (
+                                row.plugin_store_stripe_account_id ? (
+                                  <Badge
+                                    variant="outline"
+                                    className="border-green-200 bg-green-50 text-green-700"
+                                    title={`Plugin Stripe account for this order's store: ${row.plugin_store_stripe_account_id}`}
+                                  >
+                                    Plugin Stripe
+                                  </Badge>
+                                ) : (
+                                  <span
+                                    className="text-xs text-amber-600"
+                                    title="No plugin Stripe account stored for this order. Use the plugin store's bank details from Plugin Orders to pay manually."
+                                  >
+                                    No plugin checkout
+                                  </span>
+                                )
+                              ) : (
+                                <span className="text-gray-300">—</span>
+                              )}
                             </td>
                             <td className="py-3 px-4 text-sm text-gray-500 whitespace-nowrap">
                               {formatPayoutDate(row.delivered_at)}

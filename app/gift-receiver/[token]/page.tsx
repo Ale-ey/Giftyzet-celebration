@@ -89,6 +89,11 @@ export default function GiftReceiverPage() {
       window.dispatchEvent(new Event("ordersUpdated"))
       showToast("Your details have been confirmed. Your gift will be delivered soon!", "success")
       setSubmitted(true)
+      fetch("/api/plugin/notify-store", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ gift_token: token }),
+      }).catch(() => {})
     } catch (err: any) {
       console.error("Error submitting receiver details:", err)
       showToast(err.message || "Failed to submit. Please try again.", "error")

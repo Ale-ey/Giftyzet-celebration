@@ -9,6 +9,13 @@ export interface PluginOrderRow {
   store_name: string
   vendor_name: string
   integration_name: string
+  /** Store details for admin: name, email, phone, IBAN only */
+  store_back_name: string | null
+  store_back_email: string | null
+  store_back_phone: string | null
+  store_back_iban: string | null
+  /** Store Stripe account for plugin checkout destination (if provided on order) */
+  store_back_stripe_account_id: string | null
   status: string
   payment_status: string
   total: number
@@ -48,7 +55,7 @@ export async function GET(req: NextRequest) {
 
     let query = supabase
       .from('orders')
-      .select('id, order_number, external_order_id, status, payment_status, total, plugin_fee, plugin_integration_id, created_at, confirmed_at')
+      .select('id, order_number, external_order_id, status, payment_status, total, plugin_fee, plugin_integration_id, created_at, confirmed_at, plugin_store_notify_email, plugin_store_name, plugin_store_phone, plugin_store_iban, plugin_store_stripe_account_id')
       .eq('order_type', 'plugin')
       .not('plugin_integration_id', 'is', null)
       .order('created_at', { ascending: false })
@@ -99,6 +106,13 @@ export async function GET(req: NextRequest) {
       const commissionAmount = Math.round((orderTotal * commissionPercent) / 100 * 100) / 100
       const vendorAmount = Math.max(0, Math.round((orderTotal - commissionAmount - pluginFee) * 100) / 100)
 
+      const ord = o as {
+        plugin_store_notify_email?: string
+        plugin_store_name?: string
+        plugin_store_phone?: string
+        plugin_store_iban?: string
+        plugin_store_stripe_account_id?: string
+      }
       return {
         id: o.id,
         order_number: o.order_number,
@@ -106,6 +120,11 @@ export async function GET(req: NextRequest) {
         store_name: store?.name || '—',
         vendor_name: vendor?.business_name || vendor?.vendor_name || '—',
         integration_name: integ?.name || '—',
+        store_back_name: ord.plugin_store_name?.trim() || null,
+        store_back_email: ord.plugin_store_notify_email?.trim() || null,
+        store_back_phone: ord.plugin_store_phone?.trim() || null,
+        store_back_iban: ord.plugin_store_iban?.trim() || null,
+        store_back_stripe_account_id: ord.plugin_store_stripe_account_id?.trim() || null,
         status: o.status,
         payment_status: o.payment_status,
         total: orderTotal,

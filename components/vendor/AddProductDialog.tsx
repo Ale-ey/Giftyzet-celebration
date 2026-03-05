@@ -385,7 +385,7 @@ export default function AddProductDialog({ isOpen, onClose, onSave, editProduct,
             <Button
               type="submit"
               disabled={loading}
-              className="border-2 border-gray-300 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-400 disabled:opacity-50"
+              className="bg-primary text-white hover:bg-primary/90 disabled:opacity-50"
             >
               {loading ? "Saving..." : editProduct ? "Update Product" : "Add Product"}
             </Button>

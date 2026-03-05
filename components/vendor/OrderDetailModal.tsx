@@ -1,6 +1,6 @@
 "use client"
 
-import { X, Package, Truck, CheckCircle2, Clock, MapPin, User, Gift } from "lucide-react"
+import { X, Package, Truck, CheckCircle2, Clock, MapPin, User, Gift, ChevronDown } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -8,6 +8,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import type { Order } from "@/types"
@@ -313,27 +319,43 @@ export default function OrderDetailModal({ isOpen, onClose, order, onStatusUpdat
           {onStatusUpdate && (
             <div className="space-y-3 pt-4 border-t border-gray-200">
               <div className="flex items-center gap-2 flex-wrap">
-                <label htmlFor="order-status" className="text-sm font-medium text-gray-700">Update status:</label>
-                <select
-                  id="order-status"
-                  value={order.status}
-                  onChange={(e) => {
-                    const newStatus = e.target.value as Order["status"]
-                    if (order.orderType === "gift" && !order.receiverAddress && (newStatus === "confirmed" || newStatus === "dispatched")) {
-                      alert("Cannot confirm or dispatch: Receiver address is required for gift orders.")
-                      return
-                    }
-                    onStatusUpdate(order.id, newStatus)
-                    onClose()
-                  }}
-                  className="rounded border border-gray-200 bg-white px-3 py-2 text-gray-900 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                >
-                  <option value="pending">Pending</option>
-                  <option value="confirmed">Confirmed</option>
-                  <option value="dispatched">Dispatched</option>
-                  <option value="delivered">Delivered</option>
-                  <option value="cancelled">Cancelled</option>
-                </select>
+                <span className="text-sm font-medium text-gray-700">Update status:</span>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="flex items-center gap-2 rounded-md border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-900 hover:bg-primary/10 hover:text-primary"
+                    >
+                      <span className="capitalize">{order.status}</span>
+                      <ChevronDown className="h-4 w-4 opacity-70" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="min-w-[180px]">
+                    {["pending", "confirmed", "dispatched", "delivered", "cancelled"].map((status) => (
+                      <DropdownMenuItem
+                        key={status}
+                        onClick={() => {
+                          const newStatus = status as Order["status"]
+                          if (
+                            order.orderType === "gift" &&
+                            !order.receiverAddress &&
+                            (newStatus === "confirmed" || newStatus === "dispatched")
+                          ) {
+                            alert("Cannot confirm or dispatch: Receiver address is required for gift orders.")
+                            return
+                          }
+                          if (newStatus !== order.status) {
+                            onStatusUpdate(order.id, newStatus)
+                          }
+                          onClose()
+                        }}
+                        className={order.status === status ? "bg-primary/5 text-primary capitalize" : "capitalize"}
+                      >
+                        {status}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
               {/* Confirm Order Button */}
               {order.status === "pending" && (

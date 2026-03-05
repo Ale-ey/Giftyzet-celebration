@@ -15,6 +15,12 @@ export interface PayoutRowApi {
   delivered_at: string
   status: "pending" | "paid" | "failed"
   paid_at?: string
+  /** True if store has Stripe Connect linked so admin can pay to vendor's Stripe account */
+  has_stripe_account?: boolean
+  /** True if this payout row comes from a plugin order */
+  is_plugin_order?: boolean
+  /** Plugin store Stripe account ID (if provided on the order) for plugin checkout payouts */
+  plugin_store_stripe_account_id?: string | null
 }
 
 /**
@@ -65,13 +71,13 @@ export async function GET(req: NextRequest) {
 
     const { data: orders } = await supabase
       .from("orders")
-      .select("id, order_number")
+      .select("id, order_number, order_type, plugin_fee, plugin_store_stripe_account_id")
       .in("id", vendorOrders.map((vo) => vo.order_id))
     const orderMap = new Map((orders || []).map((o) => [o.id, o]))
 
     const { data: stores } = await supabase
       .from("stores")
-      .select("id, name")
+      .select("id, name, stripe_account_id")
       .in("id", vendorOrders.map((vo) => vo.store_id))
     const storeMap = new Map((stores || []).map((s) => [s.id, s]))
 
@@ -101,19 +107,31 @@ export async function GET(req: NextRequest) {
     const payouts: PayoutRowApi[] = []
 
     for (const vo of vendorOrders) {
+      const orderRow = orderMap.get(vo.order_id)
+      const isPluginOrder = orderRow?.order_type === "plugin"
+      const pluginFee = Math.round((Number(orderRow?.plugin_fee ?? 0)) * 100) / 100
+
       let orderTotal = 0
-      for (const item of orderItems || []) {
-        if (item.order_id !== vo.order_id) continue
-        const price = Number(item.price)
-        const qty = item.quantity || 1
-        if (item.product_id) {
-          const storeId = productStoreMap.get(item.product_id)
-          if (storeId === vo.store_id) orderTotal += price * qty
-        } else if (item.service_id) {
-          const storeId = serviceStoreMap.get(item.service_id)
-          if (storeId === vo.store_id) orderTotal += price * qty
+      if (isPluginOrder) {
+        for (const item of orderItems || []) {
+          if (item.order_id !== vo.order_id) continue
+          orderTotal += Number(item.price) * (item.quantity || 1)
+        }
+      } else {
+        for (const item of orderItems || []) {
+          if (item.order_id !== vo.order_id) continue
+          const price = Number(item.price)
+          const qty = item.quantity || 1
+          if (item.product_id) {
+            const storeId = productStoreMap.get(item.product_id)
+            if (storeId === vo.store_id) orderTotal += price * qty
+          } else if (item.service_id) {
+            const storeId = serviceStoreMap.get(item.service_id)
+            if (storeId === vo.store_id) orderTotal += price * qty
+          }
         }
       }
+      orderTotal = Math.round(orderTotal * 100) / 100
 
       const commissionAmount =
         vo.commission_amount != null
@@ -122,16 +140,21 @@ export async function GET(req: NextRequest) {
       const vendorAmount =
         vo.vendor_amount != null
           ? Number(vo.vendor_amount)
-          : Math.round((orderTotal - commissionAmount) * 100) / 100
+          : Math.max(0, Math.round((orderTotal - commissionAmount - pluginFee) * 100) / 100)
 
       const order = orderMap.get(vo.order_id)
       const store = storeMap.get(vo.store_id)
       const vendor = vendorMap.get(vo.vendor_id)
+      const pluginStoreStripeAccountId =
+        isPluginOrder && order
+          ? ((order as { plugin_store_stripe_account_id?: string | null }).plugin_store_stripe_account_id ?? null)
+          : null
       const storeName = store?.name || "—"
       const vendorName = vendor?.business_name || vendor?.vendor_name || "—"
       const payoutStatus = (vo.payout_status === "paid" || vo.payout_status === "failed"
         ? vo.payout_status
         : "pending") as "pending" | "paid" | "failed"
+      const hasStripeAccount = Boolean((store as { stripe_account_id?: string } | undefined)?.stripe_account_id)
 
       payouts.push({
         id: vo.id,
@@ -140,12 +163,15 @@ export async function GET(req: NextRequest) {
         order_number: order?.order_number || String(vo.order_id).slice(0, 8),
         store_name: storeName,
         vendor_name: vendorName,
-        order_total: Math.round(orderTotal * 100) / 100,
+        order_total: orderTotal,
         commission_amount: commissionAmount,
         vendor_amount: vendorAmount,
         delivered_at: vo.delivered_at || "",
         status: payoutStatus,
         paid_at: vo.payout_at || undefined,
+        has_stripe_account: payoutStatus === "pending" || payoutStatus === "failed" ? hasStripeAccount : undefined,
+        is_plugin_order: isPluginOrder,
+        plugin_store_stripe_account_id: pluginStoreStripeAccountId,
       })
     }
 

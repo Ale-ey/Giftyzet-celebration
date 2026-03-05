@@ -56,7 +56,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-screen flex bg-white">
-      <aside className="w-64 border-r border-gray-200 bg-white/80 backdrop-blur-sm">
+      <aside className="w-64 border-r border-gray-200 bg-white/80 backdrop-blur-sm overflow-y-auto">
         <div className="px-6 py-5 border-b border-gray-200">
           <div className="flex items-center gap-2">
             <div className="h-8 w-8 rounded-full bg-primary text-white flex items-center justify-center font-bold text-sm">

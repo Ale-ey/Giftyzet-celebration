@@ -2,7 +2,18 @@
 
 import { useEffect, useState, useRef } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { Save, ArrowLeft, Upload, X, CreditCard, CheckCircle2, ExternalLink, Key, Copy, Trash2 } from "lucide-react"
+import {
+  Save,
+  ArrowLeft,
+  Upload,
+  X,
+  CreditCard,
+  CheckCircle2,
+  ExternalLink,
+  Key,
+  Copy,
+  Trash2,
+} from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -459,15 +470,18 @@ export default function VendorStoreSetup() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="text-gray-600">Loading...</div>
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4" />
+          <p className="text-gray-600">Preparing your store profile…</p>
+        </div>
       </div>
     )
   }
 
   if (notSignedIn) {
     return (
-      <div className="min-h-screen bg-white">
+      <div className="min-h-screen bg-slate-50">
         <div className="container mx-auto px-4 py-8">
           <Button
             variant="ghost"
@@ -478,9 +492,11 @@ export default function VendorStoreSetup() {
             Back to Dashboard
           </Button>
           <div className="max-w-5xl mx-auto">
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Store Setup</h1>
-            <p className="text-gray-600 mb-8">Configure your store details and information</p>
-            <Card className="border border-gray-200 bg-white">
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Store profile setup</h1>
+            <p className="text-gray-600 mb-8">
+              Create your vendor store profile to start receiving orders and payouts.
+            </p>
+            <Card className="border border-gray-200 bg-white rounded-xl shadow-sm">
               <CardContent className="p-8 text-center">
                 <p className="text-gray-600 mb-6">
                   Please sign in to access Store Setup. You need to be logged in as a vendor to edit your store.
@@ -495,7 +511,7 @@ export default function VendorStoreSetup() {
                   <Button
                     variant="outline"
                     onClick={() => router.push("/")}
-                    className="border-gray-200 text-gray-700 bg-white hover:bg-gray-50"
+                    className="border-gray-200 bg-white text-gray-900 hover:bg-primary/10 hover:text-primary"
                   >
                     Back to home
                   </Button>
@@ -510,7 +526,7 @@ export default function VendorStoreSetup() {
 
   if (needsRegistration || loadError) {
     return (
-      <div className="min-h-screen bg-white">
+      <div className="min-h-screen bg-slate-50">
         <div className="container mx-auto px-4 py-8">
           <Button
             variant="ghost"
@@ -521,9 +537,11 @@ export default function VendorStoreSetup() {
             Back to Dashboard
           </Button>
           <div className="max-w-5xl mx-auto">
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Store Setup</h1>
-            <p className="text-gray-600 mb-8">Configure your store details and information</p>
-            <Card className="border border-gray-200 bg-white">
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Store profile setup</h1>
+            <p className="text-gray-600 mb-8">
+              Before customizing your live profile, finish a quick one-time store registration.
+            </p>
+            <Card className="border border-gray-200 bg-white rounded-xl shadow-sm">
               <CardContent className="p-8 text-center">
                 <p className="text-gray-600 mb-6">
                   {loadError
@@ -545,358 +563,443 @@ export default function VendorStoreSetup() {
   }
 
   return (
-    <div className="min-h-screen bg-white">
-      <div className="container mx-auto px-4 py-8">
+    <div className="min-h-screen bg-slate-50">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Button
           variant="ghost"
           onClick={() => router.push("/vendor")}
           className="mb-6 text-gray-900 hover:text-primary hover:bg-primary/10"
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Dashboard
+          Back to dashboard
         </Button>
 
-        <div className="max-w-5xl mx-auto">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Store Setup</h1>
-          <p className="text-gray-600 mb-8">Configure your store details and information</p>
+        <div className="max-w-6xl mx-auto space-y-6">
+          {/* Header + progress style */}
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">Store profile setup</h1>
+              <p className="text-gray-600 mt-2">
+                Make your store look premium to customers and ensure payouts work smoothly.
+              </p>
+            </div>
+            <div className="rounded-full bg-white shadow-sm border border-gray-100 px-4 py-2 flex flex-wrap items-center gap-2 justify-start lg:justify-end">
+              <div className="flex items-center gap-1 text-xs font-medium text-gray-600">
+                <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-semibold">
+                  1
+                </span>
+                <span>Profile</span>
+              </div>
+              <span className="text-gray-400 text-xs">—</span>
+              <div className="flex items-center gap-1 text-xs font-medium text-gray-500">
+                <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-gray-100 text-gray-500 text-xs font-semibold">
+                  2
+                </span>
+                <span>Branding</span>
+              </div>
+              <span className="text-gray-400 text-xs">—</span>
+              <div className="flex items-center gap-1 text-xs font-medium text-gray-500">
+                <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-gray-100 text-gray-500 text-xs font-semibold">
+                  3
+                </span>
+                <span>Payments & API</span>
+              </div>
+            </div>
+          </div>
 
-          <Card className="border border-gray-200 bg-white">
-            <CardHeader>
-              <CardTitle className="text-gray-900">Store Information</CardTitle>
-              <CardDescription className="text-gray-600">
-                Update your store details to help customers find and learn about your business
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleSubmit} className="space-y-6">
-                <div className="space-y-2">
-                  <label htmlFor="name" className="text-sm font-semibold text-gray-900">
-                    Store Name *
-                  </label>
-                  <Input
-                    id="name"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    required
-                    className="bg-white border-gray-200 text-gray-900"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <label htmlFor="description" className="text-sm font-semibold text-gray-900">
-                    Description
-                  </label>
-                  <textarea
-                    id="description"
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    rows={4}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-md bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-300"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <label htmlFor="category" className="text-sm font-semibold text-gray-900">
-                    Category
-                  </label>
-                  <select
-                    id="category"
-                    value={formData.category}
-                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-md bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-300"
-                  >
-                    <option value="">Select a category</option>
-                    {STORE_CATEGORIES.map((cat) => (
-                      <option key={cat} value={cat}>
-                        {cat}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="space-y-2">
-                  <label htmlFor="address" className="text-sm font-semibold text-gray-900">
-                    Address
-                  </label>
-                  <Input
-                    id="address"
-                    value={formData.address}
-                    onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                    className="bg-white border-gray-200 text-gray-900"
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label htmlFor="phone" className="text-sm font-semibold text-gray-900">
-                      Phone
-                    </label>
-                    <Input
-                      id="phone"
-                      type="tel"
-                      value={formData.phone}
-                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                      className="bg-white border-gray-200 text-gray-900"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <label htmlFor="email" className="text-sm font-semibold text-gray-900">
-                      Email
-                    </label>
-                    <Input
-                      id="email"
-                      type="email"
-                      value={formData.email}
-                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                      className="bg-white border-gray-200 text-gray-900"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <label htmlFor="website" className="text-sm font-semibold text-gray-900">
-                    Website
-                  </label>
-                  <Input
-                    id="website"
-                    type="url"
-                    value={formData.website}
-                    onChange={(e) => setFormData({ ...formData, website: e.target.value })}
-                    placeholder="https://www.example.com"
-                    className="bg-white border-gray-200 text-gray-900"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <label htmlFor="logo" className="text-sm font-semibold text-gray-900">
-                    Store Logo
-                  </label>
-                  
-                  {/* Logo Preview */}
-                  {logoPreview && (
-                    <div className="mb-4 relative inline-block">
-                      <img
-                        src={logoPreview}
-                        alt="Logo preview"
-                        className="w-32 h-32 object-cover rounded-lg border border-gray-200"
+          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,2fr)_minmax(0,1.2fr)] gap-6 items-start">
+            {/* Left: main form */}
+            <Card className="border border-gray-100 bg-white rounded-xl shadow-sm">
+              <CardHeader className="border-b border-gray-100 pb-4">
+                <CardTitle className="text-gray-900">Store details</CardTitle>
+                <CardDescription className="text-gray-600">
+                  This information appears on customer-facing pages and in emails.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="pt-6">
+                <form onSubmit={handleSubmit} className="space-y-8">
+                  {/* Basic info */}
+                  <div className="space-y-4">
+                    <div className="space-y-1.5">
+                      <label htmlFor="name" className="text-sm font-semibold text-gray-900">
+                        Store name *
+                      </label>
+                      <Input
+                        id="name"
+                        value={formData.name}
+                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                        required
+                        placeholder="Giftyzet Flowers & Gifts"
+                        className="bg-white border-gray-200 text-gray-900"
                       />
-                      <button
-                        type="button"
-                        onClick={handleRemoveLogo}
-                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
+                      <p className="text-xs text-gray-500">
+                        Use a clear brand name customers will recognize on emails and receipts.
+                      </p>
                     </div>
-                  )}
 
-                  {/* File Upload */}
-                  <div className="flex items-center gap-4">
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="image/*"
-                      onChange={handleLogoUpload}
-                      className="hidden"
-                      id="logo-upload"
-                    />
+                    <div className="space-y-1.5">
+                      <label htmlFor="description" className="text-sm font-semibold text-gray-900">
+                        Short bio / tagline
+                      </label>
+                      <textarea
+                        id="description"
+                        value={formData.description}
+                        onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                        rows={4}
+                        placeholder="Describe what you sell and what makes your store special."
+                        className="w-full px-3 py-2 border border-gray-200 rounded-md bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                      />
+                      <p className="text-xs text-gray-500">
+                        This appears on your public store profile and in some email templates.
+                      </p>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label htmlFor="category" className="text-sm font-semibold text-gray-900">
+                        Category
+                      </label>
+                      <select
+                        id="category"
+                        value={formData.category}
+                        onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-200 rounded-md bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                      >
+                        <option value="">Select a category</option>
+                        {STORE_CATEGORIES.map((cat) => (
+                          <option key={cat} value={cat}>
+                            {cat}
+                          </option>
+                        ))}
+                      </select>
+                      <p className="text-xs text-gray-500">Helps customers understand what type of store you are.</p>
+                    </div>
+                  </div>
+
+                  {/* Contact & address */}
+                  <div className="space-y-4 border-t border-gray-100 pt-6">
+                    <h3 className="text-sm font-semibold text-gray-900">Contact & location</h3>
+                    <div className="space-y-1.5">
+                      <label htmlFor="address" className="text-sm font-medium text-gray-900">
+                        Business address
+                      </label>
+                      <Input
+                        id="address"
+                        value={formData.address}
+                        onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                        placeholder="Street, city, state, ZIP"
+                        className="bg-white border-gray-200 text-gray-900"
+                      />
+                      <p className="text-xs text-gray-500">
+                        Used for invoices and some shipping-related emails. Customers do not see your full address by
+                        default.
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <label htmlFor="phone" className="text-sm font-medium text-gray-900">
+                          Support phone
+                        </label>
+                        <Input
+                          id="phone"
+                          type="tel"
+                          value={formData.phone}
+                          onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                          placeholder="+1 (555) 123-4567"
+                          className="bg-white border-gray-200 text-gray-900"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label htmlFor="email" className="text-sm font-medium text-gray-900">
+                          Contact email
+                        </label>
+                        <Input
+                          id="email"
+                          type="email"
+                          value={formData.email}
+                          onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                          placeholder="support@yourstore.com"
+                          className="bg-white border-gray-200 text-gray-900"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label htmlFor="website" className="text-sm font-medium text-gray-900">
+                        Website (optional)
+                      </label>
+                      <Input
+                        id="website"
+                        type="url"
+                        value={formData.website}
+                        onChange={(e) => setFormData({ ...formData, website: e.target.value })}
+                        placeholder="https://www.example.com"
+                        className="bg-white border-gray-200 text-gray-900"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex flex-wrap gap-3 pt-4 border-t border-gray-100">
+                    <Button
+                      type="submit"
+                      disabled={saving}
+                      className="bg-primary text-white hover:bg-primary/90"
+                    >
+                      <Save className="h-4 w-4 mr-2" />
+                      {saving ? "Saving…" : "Save profile"}
+                    </Button>
                     <Button
                       type="button"
-                      onClick={() => fileInputRef.current?.click()}
                       variant="outline"
-                      className="border-2 border-gray-300 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-400"
+                      onClick={() => router.push("/vendor")}
+                      className="border-primary/40 bg-white text-primary hover:bg-primary/5 hover:border-primary/60"
                     >
-                      <Upload className="h-4 w-4 mr-2" />
-                      {logoPreview ? "Change Logo" : "Upload Logo"}
+                      Cancel
                     </Button>
-                    {logoPreview && (
-                      <span className="text-sm text-gray-600">Logo uploaded</span>
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
+
+            {/* Right: branding preview + integrations */}
+            <div className="space-y-4">
+              {/* Branding / logo */}
+              <Card className="border border-gray-100 bg-white rounded-xl shadow-sm">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-semibold text-gray-900">Branding</CardTitle>
+                  <CardDescription className="text-gray-600">
+                    Upload a logo to make your store profile feel like a premium brand.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="pt-3">
+                  <div className="flex flex-col sm:flex-row gap-5 sm:gap-6 items-start">
+                    <div className="h-24 w-24 rounded-full bg-slate-100 flex items-center justify-center border border-dashed border-gray-300 overflow-hidden shrink-0">
+                      {logoPreview ? (
+                        <img
+                          src={logoPreview}
+                          alt="Logo preview"
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <span className="text-xs text-gray-400 text-center px-2">Logo preview</span>
+                      )}
+                    </div>
+                    <div className="flex-1 space-y-3">
+                      <p className="text-xs text-gray-500">
+                        This image appears on order emails and parts of your customer experience. A clear, centered logo
+                        works best.
+                      </p>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        onChange={handleLogoUpload}
+                        className="hidden"
+                        id="logo-upload"
+                      />
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={() => fileInputRef.current?.click()}
+                          variant="outline"
+                          className="border border-gray-300 bg-white text-gray-800 hover:bg-gray-50 hover:border-gray-400"
+                        >
+                          <Upload className="h-3 w-3 mr-2" />
+                          {logoPreview ? "Change logo" : "Upload logo"}
+                        </Button>
+                        {logoPreview && (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={handleRemoveLogo}
+                            className="border border-red-200 bg-white text-red-700 hover:bg-red-50"
+                          >
+                            <X className="h-3 w-3 mr-2" />
+                            Remove
+                          </Button>
+                        )}
+                      </div>
+                      <p className="text-xs text-gray-500">
+                        Recommended: square image, at least 256×256px. Max size 5MB. JPG, PNG, or GIF.
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Stripe payout account */}
+              {storeId && (
+                <Card className="border border-gray-100 bg-white rounded-xl shadow-sm">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                      <CreditCard className="h-4 w-4" />
+                      Payouts via Stripe
+                    </CardTitle>
+                    <CardDescription className="text-gray-600">
+                      Connect Stripe so you can receive your share of each delivered order.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="pt-2">
+                    {stripeConnected ? (
+                      <div className="flex flex-col gap-3">
+                        <div className="flex items-center gap-2 text-green-700 text-sm">
+                          <CheckCircle2 className="h-4 w-4" />
+                          <span className="font-medium">Stripe account connected</span>
+                        </div>
+                        <p className="text-xs text-gray-600">
+                          You can review balances and payouts inside your Stripe Express dashboard. You can also update
+                          your bank account details there.
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            type="button"
+                            onClick={handleOpenStripeDashboard}
+                            disabled={stripeDashboardOpening}
+                            variant="outline"
+                            className="border-primary/50 bg-white text-primary hover:bg-primary/5 disabled:opacity-50"
+                          >
+                            <ExternalLink className="h-4 w-4 mr-2" />
+                            {stripeDashboardOpening ? "Opening…" : "Open Stripe dashboard"}
+                          </Button>
+                          <Button
+                            type="button"
+                            onClick={handleConnectStripe}
+                            disabled={stripeConnecting}
+                            variant="outline"
+                            className="border-primary/40 bg-white text-primary hover:bg-primary/5 hover:border-primary/60 disabled:opacity-50"
+                          >
+                            <CreditCard className="h-4 w-4 mr-2" />
+                            {stripeConnecting ? "Redirecting…" : "Reconnect / update Stripe"}
+                          </Button>
+                          <Button
+                            type="button"
+                            onClick={handleDisconnectStripe}
+                            disabled={stripeDisconnecting}
+                            variant="outline"
+                            className="border-red-200 bg-white text-red-700 hover:bg-red-50 disabled:opacity-50"
+                          >
+                            {stripeDisconnecting ? "Disconnecting…" : "Disconnect Stripe"}
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        <p className="text-xs text-gray-600">
+                          Required to receive payouts. You will be redirected to Stripe to complete onboarding.
+                        </p>
+                        <Button
+                          type="button"
+                          onClick={handleConnectStripe}
+                          disabled={stripeConnecting}
+                          variant="outline"
+                          className="border-primary/50 bg-white text-primary hover:bg-primary/5 disabled:opacity-50"
+                        >
+                          <CreditCard className="h-4 w-4 mr-2" />
+                          {stripeConnecting ? "Redirecting…" : "Connect Stripe account"}
+                        </Button>
+                      </div>
                     )}
-                  </div>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Upload an image file (max 5MB). Supported formats: JPG, PNG, GIF
-                  </p>
-                </div>
+                  </CardContent>
+                </Card>
+              )}
 
-                <div className="flex gap-4 pt-4">
-                  <Button
-                    type="submit"
-                    disabled={saving}
-                    className="border-2 border-gray-300 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-400"
-                  >
-                    <Save className="h-4 w-4 mr-2" />
-                    {saving ? "Saving..." : "Save Changes"}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => router.push("/vendor")}
-                    className="border-2 border-gray-300 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-400"
-                  >
-                    Cancel
-                  </Button>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
-
-          {/* Stripe payout account */}
-          {storeId && (
-            <Card className="border border-gray-200 bg-gray-50 mt-8">
-              <CardHeader>
-                <CardTitle className="text-gray-900 flex items-center gap-2 text-base">
-                  <CreditCard className="h-4 w-4" />
-                  Stripe payout account
-                </CardTitle>
-                <CardDescription className="text-gray-600">
-                  Connect your Stripe account to receive payouts. After an order is marked delivered, your share (after platform commission) is transferred when the admin processes payouts.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {stripeConnected ? (
-                  <div className="flex flex-col gap-3">
-                    <div className="flex items-center gap-2 text-green-700">
-                      <CheckCircle2 className="h-5 w-5" />
-                      <span className="font-medium">Stripe account connected</span>
-                    </div>
-                    <p className="text-sm text-gray-600">
-                      Open your Stripe Express dashboard to see your balance, payouts, and test transfers.
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      <Button
-                        type="button"
-                        onClick={handleOpenStripeDashboard}
-                        disabled={stripeDashboardOpening}
-                        variant="outline"
-                        className="border-primary/50 bg-white text-primary hover:bg-primary/5"
-                      >
-                        <ExternalLink className="h-4 w-4 mr-2" />
-                        {stripeDashboardOpening ? "Opening..." : "Open Stripe dashboard"}
-                      </Button>
-                      <Button
-                        type="button"
-                        onClick={handleConnectStripe}
-                        disabled={stripeConnecting}
-                        variant="outline"
-                        className="border-gray-300 bg-white text-gray-700"
-                      >
-                        <CreditCard className="h-4 w-4 mr-2" />
-                        {stripeConnecting ? "Redirecting..." : "Reconnect / Update Stripe"}
-                      </Button>
-                      <Button
-                        type="button"
-                        onClick={handleDisconnectStripe}
-                        disabled={stripeDisconnecting}
-                        variant="outline"
-                        className="border-gray-300 bg-white text-gray-600 hover:bg-gray-100"
-                      >
-                        {stripeDisconnecting ? "Disconnecting..." : "Disconnect Stripe account"}
-                      </Button>
-                    </div>
-                  </div>
-                ) : (
-                  <Button
-                    type="button"
-                    onClick={handleConnectStripe}
-                    disabled={stripeConnecting}
-                    variant="outline"
-                    className="border-gray-300 bg-white text-gray-700"
-                  >
-                    <CreditCard className="h-4 w-4 mr-2" />
-                    {stripeConnecting ? "Redirecting..." : "Connect Stripe account"}
-                  </Button>
-                )}
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Plugin API key – create once per store */}
-          {storeId && (
-            <Card className="border border-gray-200 bg-gray-50 mt-8">
-              <CardHeader>
-                <CardTitle className="text-gray-900 flex items-center gap-2 text-base">
-                  <Key className="h-4 w-4" />
-                  Plugin API key
-                </CardTitle>
-                <CardDescription className="text-gray-600">
-                  Create a unique API key to connect your external store or plugin to Giftyzel. You can create it once per store. Use the key in the X-API-Key header when calling the Plugin API to create and manage gift orders.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {pluginKeyLoading ? (
-                  <p className="text-sm text-gray-500">Loading...</p>
-                ) : pluginIntegration ? (
-                  <div className="flex flex-col gap-3">
-                    <div className="flex items-center gap-2 text-green-700">
-                      <CheckCircle2 className="h-5 w-5" />
-                      <span className="font-medium">API key created</span>
-                    </div>
-                    <div className="flex gap-2">
-                      <Input
-                        readOnly
-                        value={fullApiKey || pluginIntegration.api_key_prefix}
-                        className="font-mono text-sm bg-gray-100 border-gray-300 flex-1"
-                        placeholder="API key"
-                      />
-                      <Button
-                        type="button"
-                        onClick={handleCopyPluginKey}
-                        variant="outline"
-                        className="shrink-0 gap-2"
-                      >
-                        <Copy className="h-4 w-4" />
-                        {fullApiKey ? "Copy" : "Copy prefix"}
-                      </Button>
-                    </div>
-                    <p className="text-sm text-gray-600">
-                      Use this key in the X-API-Key header when calling the Plugin API. You can copy it here anytime.
-                    </p>
-                    <Button
-                      type="button"
-                      onClick={handleDeletePluginKey}
-                      disabled={pluginKeyDeleting}
-                      variant="outline"
-                      className="w-fit border-red-200 text-red-700 hover:bg-red-50 gap-2"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                      {pluginKeyDeleting ? "Deleting..." : "Delete API key"}
-                    </Button>
-                    <p className="text-xs text-gray-500">
-                      Deleting removes this key. External apps using it will stop working. You can create a new key after deleting.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="flex flex-col gap-3">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Integration name</label>
-                      <Input
-                        type="text"
-                        value={pluginIntegrationName}
-                        onChange={(e) => setPluginIntegrationName(e.target.value)}
-                        placeholder="e.g. My External Store"
-                        className="max-w-xs"
-                      />
-                    </div>
-                    <Button
-                      type="button"
-                      onClick={handleCreatePluginKey}
-                      disabled={pluginKeyCreating}
-                      variant="outline"
-                      className="border-primary/50 bg-white text-primary hover:bg-primary/5 w-fit"
-                    >
-                      <Key className="h-4 w-4 mr-2" />
-                      {pluginKeyCreating ? "Creating..." : "Create API key"}
-                    </Button>
-                    <p className="text-xs text-gray-500">
-                      You can create the key only once per store. Copy and save it when it is shown.
-                    </p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )}
-
+              {/* Plugin API key – create once per store */}
+              {storeId && (
+                <Card className="border border-gray-100 bg-white rounded-xl shadow-sm">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                      <Key className="h-4 w-4" />
+                      Plugin API key
+                    </CardTitle>
+                    <CardDescription className="text-gray-600">
+                      Connect an external website or plugin to automatically create gift orders via the Giftyzel Plugin
+                      API.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="pt-2">
+                    {pluginKeyLoading ? (
+                      <p className="text-sm text-gray-500">Loading…</p>
+                    ) : pluginIntegration ? (
+                      <div className="flex flex-col gap-3">
+                        <div className="flex items-center gap-2 text-green-700 text-sm">
+                          <CheckCircle2 className="h-4 w-4" />
+                          <span className="font-medium">API key created</span>
+                        </div>
+                        <div className="flex gap-2 flex-wrap">
+                          <Input
+                            readOnly
+                            value={fullApiKey || pluginIntegration.api_key_prefix}
+                            className="font-mono text-xs bg-gray-100 border-gray-300 flex-1"
+                            placeholder="API key"
+                          />
+                          <Button
+                            type="button"
+                            onClick={handleCopyPluginKey}
+                            variant="outline"
+                            className="shrink-0 gap-2 border-gray-300 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-400"
+                          >
+                            <Copy className="h-4 w-4" />
+                            {fullApiKey ? "Copy" : "Copy prefix"}
+                          </Button>
+                        </div>
+                        <p className="text-xs text-gray-600">
+                          Use this value in the <code className="font-mono">X-API-Key</code> header when calling the
+                          Plugin API. Treat it like a password.
+                        </p>
+                        <Button
+                          type="button"
+                          onClick={handleDeletePluginKey}
+                          disabled={pluginKeyDeleting}
+                          variant="outline"
+                          className="w-fit border-red-200 bg-white text-red-700 hover:bg-red-50 gap-2"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          {pluginKeyDeleting ? "Deleting…" : "Delete API key"}
+                        </Button>
+                        <p className="text-[11px] text-gray-500 leading-snug">
+                          Deleting will immediately stop any external integrations using this key. You can create a new
+                          key afterwards if needed.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col gap-3">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-900 mb-1">
+                            Integration name
+                          </label>
+                          <Input
+                            type="text"
+                            value={pluginIntegrationName}
+                            onChange={(e) => setPluginIntegrationName(e.target.value)}
+                            placeholder="e.g. Shopify store, WooCommerce plugin"
+                            className="max-w-xs"
+                          />
+                        </div>
+                        <Button
+                          type="button"
+                          onClick={handleCreatePluginKey}
+                          disabled={pluginKeyCreating}
+                          variant="outline"
+                          className="border-primary/50 bg-white text-primary hover:bg-primary/5 w-fit disabled:opacity-50"
+                        >
+                          <Key className="h-4 w-4 mr-2" />
+                          {pluginKeyCreating ? "Creating…" : "Create API key"}
+                        </Button>
+                        <p className="text-[11px] text-gray-500 leading-snug">
+                          You can create one key per store. Copy and store it securely when it is first shown—Giftyzel
+                          may only display the full value once.
+                        </p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </div>

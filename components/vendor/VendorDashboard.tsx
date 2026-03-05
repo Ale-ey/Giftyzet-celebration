@@ -176,7 +176,7 @@ export default function VendorDashboard() {
   const dispatchedOrders = orders.filter((o: any) => o.status === "dispatched").length
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-slate-50">
       <div className="container mx-auto px-4 py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Vendor Dashboard</h1>
@@ -185,7 +185,7 @@ export default function VendorDashboard() {
 
         {/* Revenue and Order Stats */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-          <Card className="border border-gray-200 bg-white">
+          <Card className="border border-gray-100 bg-white rounded-xl shadow-sm">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
@@ -199,7 +199,7 @@ export default function VendorDashboard() {
             </CardContent>
           </Card>
 
-          <Card className="border border-gray-200 bg-white">
+          <Card className="border border-gray-100 bg-white rounded-xl shadow-sm">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
@@ -213,7 +213,7 @@ export default function VendorDashboard() {
             </CardContent>
           </Card>
 
-          <Card className="border border-gray-200 bg-white">
+          <Card className="border border-gray-100 bg-white rounded-xl shadow-sm">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
@@ -230,7 +230,7 @@ export default function VendorDashboard() {
 
         {/* Order Status Stats */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-          <Card className="border border-gray-200 bg-white">
+          <Card className="border border-gray-100 bg-white rounded-xl shadow-sm">
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium text-gray-600">Pending Orders</CardTitle>
             </CardHeader>
@@ -238,7 +238,7 @@ export default function VendorDashboard() {
               <div className="text-3xl font-bold text-gray-900">{pendingOrders}</div>
             </CardContent>
           </Card>
-          <Card className="border border-gray-200 bg-white">
+          <Card className="border border-gray-100 bg-white rounded-xl shadow-sm">
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium text-gray-600">Confirmed Orders</CardTitle>
             </CardHeader>
@@ -246,7 +246,7 @@ export default function VendorDashboard() {
               <div className="text-3xl font-bold text-gray-900">{confirmedOrders}</div>
             </CardContent>
           </Card>
-          <Card className="border border-gray-200 bg-white">
+          <Card className="border border-gray-100 bg-white rounded-xl shadow-sm">
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium text-gray-600">Dispatched Orders</CardTitle>
             </CardHeader>
@@ -256,56 +256,7 @@ export default function VendorDashboard() {
           </Card>
         </div>
 
-        {/* Quick Actions */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <Card className="border border-gray-200 bg-white hover:shadow-md transition-shadow cursor-pointer"
-            onClick={() => router.push("/vendor/store")}
-          >
-            <CardHeader>
-              <Settings className="h-8 w-8 text-gray-600 mb-2" />
-              <CardTitle className="text-gray-900">Store Setup</CardTitle>
-              <CardDescription className="text-gray-600">
-                Configure your store details and settings
-              </CardDescription>
-            </CardHeader>
-          </Card>
-
-          <Card className="border border-gray-200 bg-white hover:shadow-md transition-shadow cursor-pointer"
-            onClick={() => router.push("/vendor/products")}
-          >
-            <CardHeader>
-              <Package className="h-8 w-8 text-gray-600 mb-2" />
-              <CardTitle className="text-gray-900">Products & Services</CardTitle>
-              <CardDescription className="text-gray-600">
-                Add and manage your products and services
-              </CardDescription>
-            </CardHeader>
-          </Card>
-
-          <Card className="border border-gray-200 bg-white hover:shadow-md transition-shadow cursor-pointer"
-            onClick={() => router.push("/vendor/orders")}
-          >
-            <CardHeader>
-              <ShoppingBag className="h-8 w-8 text-gray-600 mb-2" />
-              <CardTitle className="text-gray-900">Orders</CardTitle>
-              <CardDescription className="text-gray-600">
-                View and manage customer orders
-              </CardDescription>
-            </CardHeader>
-          </Card>
-
-          <Card className="border border-gray-200 bg-white hover:shadow-md transition-shadow cursor-pointer"
-            onClick={() => router.push("/vendor/payouts")}
-          >
-            <CardHeader>
-              <Wallet className="h-8 w-8 text-gray-600 mb-2" />
-              <CardTitle className="text-gray-900">Payouts</CardTitle>
-              <CardDescription className="text-gray-600">
-                View pending and received payouts
-              </CardDescription>
-            </CardHeader>
-          </Card>
-        </div>
+        {/* Quick Actions removed – navigation handled by sidebar */}
       </div>
     </div>
   )

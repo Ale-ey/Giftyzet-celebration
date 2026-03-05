@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { Save, ArrowLeft, Upload, X, CreditCard, CheckCircle2, ExternalLink } from "lucide-react"
+import { Save, ArrowLeft, Upload, X, CreditCard, CheckCircle2, ExternalLink, Key, Copy, Trash2 } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -40,6 +40,12 @@ export default function VendorStoreSetup() {
   const [loadError, setLoadError] = useState<string | null>(null)
   const [needsRegistration, setNeedsRegistration] = useState(false)
   const [notSignedIn, setNotSignedIn] = useState(false)
+  const [pluginIntegration, setPluginIntegration] = useState<{ id: string; store_id: string; name: string; api_key_prefix: string; api_key_plain?: string | null } | null>(null)
+  const [pluginKeyLoading, setPluginKeyLoading] = useState(false)
+  const [pluginKeyCreating, setPluginKeyCreating] = useState(false)
+  const [pluginKeyModal, setPluginKeyModal] = useState<string | null>(null)
+  const [pluginKeyDeleting, setPluginKeyDeleting] = useState(false)
+  const [pluginIntegrationName, setPluginIntegrationName] = useState("")
 
   // Load store from backend and fill form; also listen to auth so we run when session is ready
   useEffect(() => {
@@ -131,6 +137,37 @@ export default function VendorStoreSetup() {
       subscription?.unsubscribe()
     }
   }, [router])
+
+  // Load plugin integration for this store when storeId is available
+  useEffect(() => {
+    if (!storeId) {
+      setPluginIntegration(null)
+      return
+    }
+    let cancelled = false
+    setPluginKeyLoading(true)
+    async function load() {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session?.access_token || cancelled) return
+        const res = await fetch("/api/vendor/plugin-integration", {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        })
+        const data = await res.json()
+        if (cancelled) return
+        const list = Array.isArray(data.integrations) ? data.integrations : []
+        const forThisStore = list.find((i: { store_id: string }) => i.store_id === storeId)
+        setPluginIntegration(forThisStore ? { id: forThisStore.id, store_id: forThisStore.store_id, name: forThisStore.name || "", api_key_prefix: forThisStore.api_key_prefix || "", api_key_plain: forThisStore.api_key_plain ?? null } : null)
+        if (!forThisStore) setPluginIntegrationName("My Store Plugin")
+      } catch (e) {
+        console.error("Load plugin integration error:", e)
+      } finally {
+        if (!cancelled) setPluginKeyLoading(false)
+      }
+    }
+    load()
+    return () => { cancelled = true }
+  }, [storeId])
 
   // Handle return from Stripe Connect onboarding (when started from this page)
   useEffect(() => {
@@ -232,6 +269,96 @@ export default function VendorStoreSetup() {
       showToast("Something went wrong. Please try again.", "error")
     } finally {
       setStripeDisconnecting(false)
+    }
+  }
+
+  const handleCreatePluginKey = async () => {
+    if (!storeId || !pluginIntegrationName.trim()) {
+      showToast("Enter a name for your plugin integration.", "error")
+      return
+    }
+    setPluginKeyCreating(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.access_token) {
+        showToast("Please sign in to create an API key.", "error")
+        setPluginKeyCreating(false)
+        return
+      }
+      const res = await fetch("/api/vendor/plugin-integration", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ store_id: storeId, name: pluginIntegrationName.trim(), fee_per_order: 0 }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        showToast(data.error || "Failed to create API key.", "error")
+        setPluginKeyCreating(false)
+        return
+      }
+      const key = data.api_key ?? data.api_key_plain ?? null
+      setPluginIntegration({
+        id: data.id,
+        store_id: data.store_id,
+        name: data.name || pluginIntegrationName.trim(),
+        api_key_prefix: data.api_key_prefix || "gfty_live_…",
+        api_key_plain: key,
+      })
+      setPluginKeyModal(key)
+      showToast("API key created. You can copy it below anytime.", "success")
+    } catch (e) {
+      console.error("Create plugin key error:", e)
+      showToast("Something went wrong. Please try again.", "error")
+    } finally {
+      setPluginKeyCreating(false)
+    }
+  }
+
+  const fullApiKey = pluginIntegration?.api_key_plain ?? pluginKeyModal ?? ""
+
+  const handleCopyPluginKey = () => {
+    if (fullApiKey) {
+      navigator.clipboard.writeText(fullApiKey).then(() => showToast("API key copied to clipboard.", "success")).catch(() => showToast("Could not copy. Copy the key manually.", "error"))
+      return
+    }
+    if (pluginIntegration?.api_key_prefix) {
+      navigator.clipboard.writeText(pluginIntegration.api_key_prefix).then(() => showToast("Prefix copied. Full key is not available.", "info")).catch(() => showToast("Could not copy.", "error"))
+    }
+  }
+
+  const handleDeletePluginKey = async () => {
+    if (!pluginIntegration?.id || !window.confirm("Delete this API key? Any external store or plugin using it will stop working. You can create a new key afterward.")) return
+    setPluginKeyDeleting(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.access_token) {
+        showToast("Please sign in to delete the API key.", "error")
+        setPluginKeyDeleting(false)
+        return
+      }
+      const res = await fetch(`/api/vendor/plugin-integration?integration_id=${encodeURIComponent(pluginIntegration.id)}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        showToast(data.error || "Failed to delete API key.", "error")
+        setPluginKeyDeleting(false)
+        return
+      }
+      setPluginIntegration(null)
+      setPluginKeyModal(null)
+      setPluginIntegrationName("My Store Plugin")
+      if (typeof window !== "undefined") try { sessionStorage.removeItem(`plugin_api_key_${storeId}`) } catch (_) {}
+      showToast("API key deleted. You can create a new one below.", "success")
+    } catch (e) {
+      console.error("Delete plugin key error:", e)
+      showToast("Something went wrong. Please try again.", "error")
+    } finally {
+      setPluginKeyDeleting(false)
     }
   }
 
@@ -683,6 +810,93 @@ export default function VendorStoreSetup() {
               </CardContent>
             </Card>
           )}
+
+          {/* Plugin API key – create once per store */}
+          {storeId && (
+            <Card className="border border-gray-200 bg-gray-50 mt-8">
+              <CardHeader>
+                <CardTitle className="text-gray-900 flex items-center gap-2 text-base">
+                  <Key className="h-4 w-4" />
+                  Plugin API key
+                </CardTitle>
+                <CardDescription className="text-gray-600">
+                  Create a unique API key to connect your external store or plugin to Giftyzel. You can create it once per store. Use the key in the X-API-Key header when calling the Plugin API to create and manage gift orders.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {pluginKeyLoading ? (
+                  <p className="text-sm text-gray-500">Loading...</p>
+                ) : pluginIntegration ? (
+                  <div className="flex flex-col gap-3">
+                    <div className="flex items-center gap-2 text-green-700">
+                      <CheckCircle2 className="h-5 w-5" />
+                      <span className="font-medium">API key created</span>
+                    </div>
+                    <div className="flex gap-2">
+                      <Input
+                        readOnly
+                        value={fullApiKey || pluginIntegration.api_key_prefix}
+                        className="font-mono text-sm bg-gray-100 border-gray-300 flex-1"
+                        placeholder="API key"
+                      />
+                      <Button
+                        type="button"
+                        onClick={handleCopyPluginKey}
+                        variant="outline"
+                        className="shrink-0 gap-2"
+                      >
+                        <Copy className="h-4 w-4" />
+                        {fullApiKey ? "Copy" : "Copy prefix"}
+                      </Button>
+                    </div>
+                    <p className="text-sm text-gray-600">
+                      Use this key in the X-API-Key header when calling the Plugin API. You can copy it here anytime.
+                    </p>
+                    <Button
+                      type="button"
+                      onClick={handleDeletePluginKey}
+                      disabled={pluginKeyDeleting}
+                      variant="outline"
+                      className="w-fit border-red-200 text-red-700 hover:bg-red-50 gap-2"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      {pluginKeyDeleting ? "Deleting..." : "Delete API key"}
+                    </Button>
+                    <p className="text-xs text-gray-500">
+                      Deleting removes this key. External apps using it will stop working. You can create a new key after deleting.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Integration name</label>
+                      <Input
+                        type="text"
+                        value={pluginIntegrationName}
+                        onChange={(e) => setPluginIntegrationName(e.target.value)}
+                        placeholder="e.g. My External Store"
+                        className="max-w-xs"
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      onClick={handleCreatePluginKey}
+                      disabled={pluginKeyCreating}
+                      variant="outline"
+                      className="border-primary/50 bg-white text-primary hover:bg-primary/5 w-fit"
+                    >
+                      <Key className="h-4 w-4 mr-2" />
+                      {pluginKeyCreating ? "Creating..." : "Create API key"}
+                    </Button>
+                    <p className="text-xs text-gray-500">
+                      You can create the key only once per store. Copy and save it when it is shown.
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
         </div>
       </div>
     </div>

@@ -1,0 +1,131 @@
+{
+  "info": {
+    "name": "Giftyzel Plugin API",
+    "description": "**Giftyzel Plugin API – Full integration guide**\n\n**1. Where to get your plugin API key**\n- Vendor dashboard → Store setup → Plugin API key → Create key.\n- Or ask Giftyzel admin to create one for your store.\n- The key looks like `gfty_live_xxx` (or `gfty_test_xxx` in test).\n\n**2. How to configure this Postman collection**\n- Set `base_url` to your backend base (production: `https://www.giftyzel.com`, use sandbox base if provided).\n- Set `api_key` to your full plugin API key value.\n- All requests in this collection already read `{{api_key}}` and send it in the `X-API-Key` header.\n\n**3. Authentication options (choose one per request)**\n- **Recommended:** header `X-API-Key: {{api_key}}` (already pre-filled in each request).\n- **Alternative:** header `Authorization: Bearer {{api_key}}`.\n- Do **not** use your login JWT here – only the plugin key works.\n\n**4. Typical flow for plugin checkout**\n1) Call **Validate API key** once when you configure the plugin, to confirm the key is valid.\n2) When a customer is ready to pay on your store, call **Create payment + redirect to Stripe (hosted page)** (this is the only supported flow):\n   - Send sender details, `receiver_email`, and `items`.\n   - Giftyzel creates a Stripe Checkout Session with all data in the underlying PaymentIntent `metadata` and returns a `url`.\n   - Your frontend redirects the customer to `url` (Stripe hosted page) to enter card details and pay.\n3) Stripe charges the customer and calls the Giftyzel webhook after `payment_intent.succeeded`. The webhook creates an order in Giftyzel automatically – no extra order-creation API is needed.\n4) Use **List orders** or **Get order by Giftyzel order id** to sync order data into your system.\n5) Use **Update order status (PATCH)** when your store dispatches or delivers the order so Giftyzel stays in sync.\n\n**5. Test environment tips**\n- Use Stripe test card `4242 4242 4242 4242` with any future expiry and CVC.\n- You can test the full redirect flow using the internal page `/plugin-checkout` in the Giftyzel app, or by calling the redirect request in this collection and opening the returned `url` in the browser.\n- In test, Giftyzel still creates real orders in its database; just mark them as tests in your own system.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "https://www.giftyzel.com" },
+    { "key": "api_key", "value": "YOUR_PLUGIN_API_KEY", "description": "Full plugin API key (starts with gfty_live_…). Use in X-API-Key header or as Authorization: Bearer {{api_key}}. Get it from Admin." }
+  ],
+  "item": [
+    {
+      "name": "Plugin – Orders",
+      "item": [
+        {
+          "name": "Create payment + redirect to Stripe (hosted page)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-API-Key", "value": "{{api_key}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sender_name\": \"John Sender\",\n  \"sender_email\": \"john@example.com\",\n  \"sender_phone\": \"+1234567890\",\n  \"sender_address\": \"123 Sender St, City, State 12345\",\n  \"receiver_email\": \"receiver@example.com\",\n  \"items\": [\n    { \"name\": \"Gift Product\", \"price\": 29.99, \"quantity\": 1 }\n  ],\n  \"redirect_checkout\": true,\n  \"success_url\": \"https://www.giftyzel.com/plugin-checkout/success?session_id={CHECKOUT_SESSION_ID}\",\n  \"cancel_url\": \"https://www.giftyzel.com/plugin-checkout/cancel\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/plugin/v1/checkout",
+              "host": ["{{base_url}}"],
+              "path": ["api", "plugin", "v1", "checkout"]
+            },
+            "description": "Create a Stripe Checkout Session and redirect the buyer to Stripe's **hosted Checkout page** (recommended and only supported flow).\n\n**How it works**\n- Send sender details, `receiver_email`, and `items[]`.\n- Include `redirect_checkout: true` in the body.\n- Optionally override `success_url` and `cancel_url` (otherwise Giftyzel defaults are used and point to the order status page).\n- The response contains a `url` to Stripe Checkout and `session_id`.\n- Redirect the customer to `url`; Stripe shows the amount and card form, collects the payment, and redirects back to `success_url` or `cancel_url`.\n- After payment succeeds, the Giftyzel webhook creates the order automatically."
+          }
+        },
+        {
+          "name": "Validate API key",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "X-API-Key", "value": "{{api_key}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/plugin/v1/validate",
+              "host": ["{{base_url}}"],
+              "path": ["api", "plugin", "v1", "validate"]
+            },
+            "description": "Quick health check for your plugin API key.\n\n- Sends `X-API-Key: {{api_key}}`.\n- `200` response = key is valid and linked to an active plugin integration.\n- `401` response = missing/invalid key.\n\nUse this when you first configure the plugin (or when rotating keys) so you can fail fast if the key is wrong."
+          }
+        },
+        {
+          "name": "List orders",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "X-API-Key", "value": "{{api_key}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/plugin/v1/orders?page=1&limit=20",
+              "host": ["{{base_url}}"],
+              "path": ["api", "plugin", "v1", "orders"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" }
+              ]
+            },
+            "description": "Paginated list of all plugin orders for **your** integration.\n\n- Uses your API key to scope results to your store only.\n- Optional query params: `page` (default 1), `limit` (default 20, max 50).\n- Response shape: `{ orders: [...], pagination: { page, limit, total } }`.\n\nUse this for admin list views (e.g. in your plugin backend UI) or for periodic sync jobs."
+          }
+        },
+        {
+          "name": "Get order by Giftyzel order id",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "X-API-Key", "value": "{{api_key}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/plugin/v1/orders/{{order_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "plugin", "v1", "orders", "{{order_id}}"],
+              "variable": [
+                { "key": "order_id", "value": "PASTE_GIFTYZEL_ORDER_UUID_HERE" }
+              ]
+            },
+            "description": "Fetch a **single** order by its primary Giftyzel id (`orders.id` UUID).\n\n- This is the recommended way to load full order details after it has been created by the webhook.\n- Use the `id` returned in webhooks / admin dashboards / list responses.\n\nTypical usage: your system stores the Giftyzel `order_id` and later calls this endpoint to show the latest status and receiver details."
+          }
+        },
+        {
+          "name": "Get order by external_order_id (optional)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "X-API-Key", "value": "{{api_key}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/plugin/v1/orders?external_order_id=EXT-ORDER-001",
+              "host": ["{{base_url}}"],
+              "path": ["api", "plugin", "v1", "orders"],
+              "query": [
+                { "key": "external_order_id", "value": "EXT-ORDER-001" }
+              ]
+            },
+            "description": "Optional convenience lookup by your own **external_order_id**.\n\n- Only works if you passed `external_order_id` when you initiated the payment.\n- Useful when your system has its own order id and you just want to attach the Giftyzel/Stripe data later."
+          }
+        },
+        {
+          "name": "Update order status (PATCH)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-API-Key", "value": "{{api_key}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"dispatched\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/plugin/v1/orders/{{order_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "plugin", "v1", "orders", "{{order_id}}"],
+              "variable": [
+                { "key": "order_id", "value": "PASTE_GIFTYZEL_ORDER_UUID_HERE" }
+              ]
+            },
+            "description": "Update the lifecycle status of an order **after** it has been created.\n\n- Allowed values: `pending`, `confirmed`, `dispatched`, `delivered`, `cancelled`.\n- Example body: `{ \"status\": \"dispatched\" }`.\n\nUse this from your backend when the store confirms, ships or delivers the gift so that Giftyzel and the admin dashboard always show the correct status."
+          }
+        }
+      ]
+    }
+  ]
+}

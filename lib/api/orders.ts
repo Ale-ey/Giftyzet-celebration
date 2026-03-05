@@ -259,11 +259,24 @@ export async function confirmGiftReceiver(
   data: ConfirmGiftReceiverData | string
 ) {
   const address = typeof data === 'string' ? data : data.receiverAddress
-  // Deployed Supabase may only have 2-param function (p_gift_token, p_receiver_address).
-  // Call with only those so it works without running the 5-param migration.
+  const name = typeof data === 'string' ? undefined : data.receiverName
+  const email = typeof data === 'string' ? undefined : data.receiverEmail
+  const phone = typeof data === 'string' ? undefined : data.receiverPhone
   const { data: result, error } = await supabase.rpc('confirm_gift_receiver', {
     p_gift_token: giftToken,
     p_receiver_address: address,
+    p_receiver_name: name ?? null,
+    p_receiver_email: email ?? null,
+    p_receiver_phone: phone ?? null,
+  })
+  if (error) throw error
+  return result as Record<string, unknown>
+}
+
+// Reject gift by token (recipient declines; uses RPC so anon can call)
+export async function rejectGiftReceiver(giftToken: string) {
+  const { data: result, error } = await supabase.rpc('reject_gift_receiver', {
+    p_gift_token: giftToken,
   })
   if (error) throw error
   return result as Record<string, unknown>

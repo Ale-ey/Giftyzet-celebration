@@ -5,114 +5,19 @@ import { createServerSupabase } from '@/lib/supabase/server'
 
 const API_KEY_PREFIX = 'gfty_live_'
 
-/**
- * POST /api/admin/plugin-integrations
- * Create a plugin integration (store + API key). Admin only.
- * Body: { name, store_id, fee_per_order }
- * Response: { id, name, store_id, fee_per_order, api_key } — api_key is shown only once.
- */
 export async function POST(req: NextRequest) {
-  try {
-    const token = req.headers.get('Authorization')?.replace('Bearer ', '').trim()
-    const auth = await getServerUserAndRole(token)
-    if (!auth || auth.role !== 'admin') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const body = await req.json().catch(() => ({}))
-    const { name, store_id, fee_per_order } = body
-
-    if (!name || typeof name !== 'string' || !name.trim()) {
-      return NextResponse.json(
-        { error: 'name is required' },
-        { status: 400 }
-      )
-    }
-    if (!store_id || typeof store_id !== 'string' || !store_id.trim()) {
-      return NextResponse.json(
-        { error: 'store_id is required' },
-        { status: 400 }
-      )
-    }
-    const fee = Number(fee_per_order)
-    if (isNaN(fee) || fee < 0) {
-      return NextResponse.json(
-        { error: 'fee_per_order must be a non-negative number' },
-        { status: 400 }
-      )
-    }
-
-    const supabase = createServerSupabase(token)
-
-    const { data: store, error: storeError } = await supabase
-      .from('stores')
-      .select('id, vendor_id')
-      .eq('id', store_id.trim())
-      .single()
-
-    if (storeError || !store) {
-      return NextResponse.json(
-        { error: 'Store not found or access denied' },
-        { status: 404 }
-      )
-    }
-
-    const { data: existing } = await supabase
-      .from('plugin_integrations')
-      .select('id')
-      .eq('store_id', store.id)
-      .maybeSingle()
-
-    if (existing) {
-      return NextResponse.json(
-        { error: 'This store already has a plugin integration. Use the existing API key or deactivate it first.' },
-        { status: 409 }
-      )
-    }
-
-    const rawKey = API_KEY_PREFIX + randomBytes(24).toString('hex')
-    const apiKeyHash = createHash('sha256').update(rawKey).digest('hex')
-    const apiKeyPrefix = rawKey.slice(0, 12) + '…'
-
-    const { data: integration, error: insertError } = await supabase
-      .from('plugin_integrations')
-      .insert({
-        vendor_id: store.vendor_id,
-        store_id: store.id,
-        name: name.trim(),
-        api_key_hash: apiKeyHash,
-        api_key_prefix: apiKeyPrefix,
-        fee_per_order: fee,
-        is_active: true,
-      })
-      .select('id, name, store_id, fee_per_order, api_key_prefix, created_at')
-      .single()
-
-    if (insertError) {
-      console.error('Plugin integration insert error:', insertError)
-      return NextResponse.json(
-        { error: insertError.message || 'Failed to create integration' },
-        { status: 500 }
-      )
-    }
-
-    return NextResponse.json({
-      ...integration,
-      api_key: rawKey,
-      message: 'Store this API key securely. It will not be shown again.',
-    })
-  } catch (e) {
-    console.error('Admin plugin-integrations POST error:', e)
-    return NextResponse.json(
-      { error: e instanceof Error ? e.message : 'Internal server error' },
-      { status: 500 }
-    )
-  }
+  return NextResponse.json(
+    {
+      error:
+        'POST /api/admin/plugin-integrations is disabled. Plugin API keys are created from the vendor dashboard (/api/vendor/plugin-integration). Admins can only view and delete keys here.',
+    },
+    { status: 410 }
+  )
 }
 
 /**
  * GET /api/admin/plugin-integrations
- * List plugin integrations (no API keys). Admin only.
+ * List plugin integrations with API key (for admin copy). Admin only.
  */
 export async function GET(req: NextRequest) {
   try {
@@ -125,7 +30,7 @@ export async function GET(req: NextRequest) {
     const supabase = createServerSupabase(token)
     const { data, error } = await supabase
       .from('plugin_integrations')
-      .select('id, name, store_id, vendor_id, fee_per_order, api_key_prefix, is_active, created_at')
+      .select('id, name, store_id, vendor_id, fee_per_order, api_key_prefix, api_key_plain, is_active, created_at, stores(name)')
       .order('created_at', { ascending: false })
 
     if (error) {
@@ -139,6 +44,64 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ integrations: data || [] })
   } catch (e) {
     console.error('Admin plugin-integrations GET error:', e)
+    return NextResponse.json(
+      { error: e instanceof Error ? e.message : 'Internal server error' },
+      { status: 500 }
+    )
+  }
+}
+
+/**
+ * DELETE /api/admin/plugin-integrations?integration_id=...
+ * Delete a plugin integration (API key). Admin only.
+ */
+export async function DELETE(req: NextRequest) {
+  try {
+    const token = req.headers.get('Authorization')?.replace('Bearer ', '').trim()
+    const auth = await getServerUserAndRole(token)
+    if (!auth || auth.role !== 'admin') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const integrationId = req.nextUrl.searchParams.get('integration_id')
+    if (!integrationId || !integrationId.trim()) {
+      return NextResponse.json(
+        { error: 'integration_id is required' },
+        { status: 400 }
+      )
+    }
+
+    const supabase = createServerSupabase(token)
+
+    const { data: integration, error: fetchError } = await supabase
+      .from('plugin_integrations')
+      .select('id')
+      .eq('id', integrationId.trim())
+      .maybeSingle()
+
+    if (fetchError || !integration) {
+      return NextResponse.json(
+        { error: 'Integration not found' },
+        { status: 404 }
+      )
+    }
+
+    const { error: deleteError } = await supabase
+      .from('plugin_integrations')
+      .delete()
+      .eq('id', integration.id)
+
+    if (deleteError) {
+      console.error('Admin plugin-integrations DELETE error:', deleteError)
+      return NextResponse.json(
+        { error: deleteError.message || 'Failed to delete integration' },
+        { status: 500 }
+      )
+    }
+
+    return NextResponse.json({ success: true })
+  } catch (e) {
+    console.error('Admin plugin-integrations DELETE error:', e)
     return NextResponse.json(
       { error: e instanceof Error ? e.message : 'Internal server error' },
       { status: 500 }

@@ -6,8 +6,9 @@ import { Gift, MapPin, Phone, User, CheckCircle, XCircle, Mail } from "lucide-re
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { useToast } from "@/components/ui/toast"
-import { getOrderByGiftToken, confirmGiftReceiver } from "@/lib/api/orders"
+import { getOrderByGiftToken, confirmGiftReceiver, rejectGiftReceiver } from "@/lib/api/orders"
 
 export default function GiftReceiverPage() {
   const router = useRouter()
@@ -23,13 +24,20 @@ export default function GiftReceiverPage() {
   const [loading, setLoading] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [rejected, setRejected] = useState(false)
+  const [rejectedByUserThisSession, setRejectedByUserThisSession] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [rejectModalOpen, setRejectModalOpen] = useState(false)
 
   useEffect(() => {
     const loadOrder = async () => {
       try {
         const orderData = await getOrderByGiftToken(token)
         setOrder(orderData)
+        // If receiver already rejected (order cancelled), treat as expired – no form, no actions
+        if (orderData.status === "cancelled") {
+          setRejected(true)
+          return
+        }
         setReceiverName(String(orderData.receiver_name ?? ""))
         setReceiverEmail(String(orderData.receiver_email ?? ""))
         setReceiverPhone(String(orderData.receiver_phone ?? ""))
@@ -81,6 +89,11 @@ export default function GiftReceiverPage() {
       window.dispatchEvent(new Event("ordersUpdated"))
       showToast("Your details have been confirmed. Your gift will be delivered soon!", "success")
       setSubmitted(true)
+      fetch("/api/plugin/notify-store", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ gift_token: token }),
+      }).catch(() => {})
     } catch (err: any) {
       console.error("Error submitting receiver details:", err)
       showToast(err.message || "Failed to submit. Please try again.", "error")
@@ -89,23 +102,23 @@ export default function GiftReceiverPage() {
     }
   }
 
-  const handleReject = async () => {
-    if (!confirm("Are you sure you want to reject this gift? This action cannot be undone.")) {
-      return
-    }
+  const openRejectModal = () => setRejectModalOpen(true)
+  const closeRejectModal = () => {
+    if (!loading) setRejectModalOpen(false)
+  }
 
+  const handleRejectConfirm = async () => {
     setLoading(true)
-
     try {
-      // TODO: Implement reject gift API call
-      // For now, just update local state
-      showToast("Gift rejected. The sender will be notified.", "info")
+      await rejectGiftReceiver(token)
+      setRejectModalOpen(false)
+      setRejectedByUserThisSession(true)
       setRejected(true)
-      
       window.dispatchEvent(new Event("ordersUpdated"))
-    } catch (error: any) {
-      console.error("Error rejecting gift:", error)
-      showToast(error.message || "Failed to reject gift. Please try again.", "error")
+      showToast("Gift rejected. The sender will be notified.", "info")
+    } catch (err: any) {
+      console.error("Error rejecting gift:", err)
+      showToast(err.message || "Failed to reject gift. Please try again.", "error")
     } finally {
       setLoading(false)
     }
@@ -172,9 +185,13 @@ export default function GiftReceiverPage() {
         <Card className="max-w-md w-full bg-white border-2 border-red-500 shadow-lg">
           <CardContent className="p-8 text-center">
             <XCircle className="h-16 w-16 text-red-500 mx-auto mb-4" />
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Gift Rejected</h2>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">
+              {rejectedByUserThisSession ? "Gift Rejected" : "This Gift Link Is No Longer Valid"}
+            </h2>
             <p className="text-gray-600 mb-6">
-              You have declined this gift. The sender has been notified.
+              {rejectedByUserThisSession
+                ? "You have declined this gift. The sender has been notified."
+                : "This gift was declined. This link has expired and cannot be used."}
             </p>
             <Button
               onClick={() => router.push("/marketplace")}
@@ -353,7 +370,7 @@ export default function GiftReceiverPage() {
                 </Button>
                 <Button
                   type="button"
-                  onClick={handleReject}
+                  onClick={openRejectModal}
                   disabled={loading}
                   variant="outline"
                   className="flex-1 border-2 border-red-500 text-red-600 hover:bg-red-50 bg-white"
@@ -365,6 +382,52 @@ export default function GiftReceiverPage() {
             </form>
           </CardContent>
         </Card>
+
+        {/* Reject confirmation: in-app modal only (no window.confirm / browser popup) */}
+        <Dialog open={rejectModalOpen} onOpenChange={(open) => !loading && setRejectModalOpen(open)}>
+          <DialogContent className="sm:max-w-md z-[100] bg-white shadow-xl">
+            <DialogHeader>
+              <div className="flex items-center justify-center w-16 h-16 mx-auto mb-4 rounded-full bg-red-100">
+                <XCircle className="h-8 w-8 text-red-600" />
+              </div>
+              <DialogTitle className="text-xl font-semibold text-gray-900 text-center">
+                Reject this gift?
+              </DialogTitle>
+              <DialogDescription className="text-center text-gray-600 mt-2">
+                Are you sure you want to decline this gift? This action cannot be undone and the sender may be notified.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex flex-col sm:flex-row gap-3 pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={closeRejectModal}
+                disabled={loading}
+                className="flex-1 border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                onClick={handleRejectConfirm}
+                disabled={loading}
+                className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+              >
+                {loading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2 inline-block" />
+                    Rejecting...
+                  </>
+                ) : (
+                  <>
+                    <XCircle className="h-4 w-4 mr-2" />
+                    Yes, reject gift
+                  </>
+                )}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   )

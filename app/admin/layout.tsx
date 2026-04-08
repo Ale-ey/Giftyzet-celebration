@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { usePathname, useRouter } from "next/navigation"
 import type { ReactNode } from "react"
 import { Store, Percent, Wallet, Plug, MessageSquare } from "lucide-react"
@@ -26,15 +27,31 @@ const navItems: { id: TabId; label: string; icon: ReactNode }[] = [
 export default function AdminLayout({ children }: { children: ReactNode }) {
   const router = useRouter()
   const pathname = usePathname()
+  const validTabs: TabId[] = ["stores", "commission", "payouts", "pluginOrders", "pluginIntegrations", "queries", "pluginQueries"]
+  const [currentTab, setCurrentTab] = useState<TabId>("stores")
 
-  const currentTab: TabId =
-    pathname?.startsWith("/admin/contact-queries")
-      ? "queries"
-      : pathname?.startsWith("/admin/plugin-queries")
-      ? "pluginQueries"
-      : "stores"
+  useEffect(() => {
+    // Keep sidebar highlight in sync on refresh + when navigating to dedicated routes.
+    // Query param changes (`/admin?tab=...`) won't always change `pathname`, so we also update on click.
+    if (pathname?.startsWith("/admin/contact-queries")) {
+      setCurrentTab("queries")
+      return
+    }
+    if (pathname?.startsWith("/admin/plugin-queries")) {
+      setCurrentTab("pluginQueries")
+      return
+    }
+
+    if (typeof window === "undefined") return
+    const tab = new URLSearchParams(window.location.search).get("tab")
+    if (tab && validTabs.includes(tab as TabId)) setCurrentTab(tab as TabId)
+    else setCurrentTab("stores")
+  }, [pathname])
 
   const handleNavClick = (id: TabId) => {
+    // Optimistically update active state for immediate UI feedback.
+    setCurrentTab(id)
+
     // For sections that live on the main /admin dashboard, use a tab query param.
     if (id === "stores" || id === "commission" || id === "payouts" || id === "pluginOrders" || id === "pluginIntegrations") {
       const params = new URLSearchParams()
@@ -49,7 +66,8 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
       return
     }
     if (id === "pluginQueries") {
-      router.push("/admin/plugin-queries")
+      // `plugin-queries` route does not exist; render it inside the main dashboard via tab param.
+      router.push(`/admin?tab=${encodeURIComponent(id)}`)
       return
     }
   }

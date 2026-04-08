@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState, useCallback } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import {
   Store,
   CheckCircle2,
@@ -127,6 +127,8 @@ interface PluginIntegrationRow {
 
 export default function AdminDashboard() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const urlTab = searchParams?.get("tab") ?? null
   const [loading, setLoading] = useState(true)
   const [isAuthorized, setIsAuthorized] = useState(false)
   const [activeTab, setActiveTab] = useState<TabId>("stores")
@@ -186,6 +188,12 @@ export default function AdminDashboard() {
   const [pluginIntegrationsLoading, setPluginIntegrationsLoading] = useState(false)
   const [pluginIntegrationsError, setPluginIntegrationsError] = useState<string | null>(null)
   const [pluginIntegrationKeyVisible, setPluginIntegrationKeyVisible] = useState<Set<string>>(new Set())
+
+  useEffect(() => {
+    const validTabs: TabId[] = ["stores", "commission", "payouts", "pluginOrders", "pluginIntegrations", "queries", "pluginQueries"]
+    if (urlTab && validTabs.includes(urlTab as TabId)) setActiveTab(urlTab as TabId)
+    else setActiveTab("stores")
+  }, [urlTab])
 
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -1359,7 +1367,7 @@ export default function AdminDashboard() {
               ) : (
                 <>
                   <div className="overflow-x-auto -mx-4 sm:mx-0">
-                    <table className="w-full border-collapse min-w-[820px]">
+                    <table className="w-full border-collapse min-w-[720px]">
                       <thead>
                         <tr className="border-b border-gray-200">
                           <th className="text-left py-3 px-4 text-sm font-semibold text-gray-900">Order #</th>
@@ -1369,7 +1377,6 @@ export default function AdminDashboard() {
                           <th className="text-left py-3 px-4 text-sm font-semibold text-gray-900">Vendor</th>
                           <th className="text-left py-3 px-4 text-sm font-semibold text-gray-900">Status</th>
                           <th className="text-right py-3 px-4 text-sm font-semibold text-gray-900">Total</th>
-                          <th className="text-right py-3 px-4 text-sm font-semibold text-gray-900">Plugin fee</th>
                           <th className="text-right py-3 px-4 text-sm font-semibold text-gray-900">Vendor amount</th>
                           <th className="text-left py-3 px-4 text-sm font-semibold text-gray-900">Created</th>
                         </tr>
@@ -1423,9 +1430,6 @@ export default function AdminDashboard() {
                             </td>
                             <td className="py-3 px-4 text-sm font-medium text-gray-900 text-right">
                               ${row.total.toFixed(2)}
-                            </td>
-                            <td className="py-3 px-4 text-sm text-gray-600 text-right">
-                              ${row.plugin_fee.toFixed(2)}
                             </td>
                             <td className="py-3 px-4 text-sm font-medium text-primary text-right">
                               ${row.vendor_amount.toFixed(2)}

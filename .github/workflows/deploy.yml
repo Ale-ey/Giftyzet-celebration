@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1️⃣ Checkout the latest code
+      # 1️⃣ Checkout code (just for reference, not used on EC2)
       - name: Checkout code
         uses: actions/checkout@v3
 
@@ -22,21 +22,28 @@ jobs:
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
-            set -e
+            echo "🚀 Starting deployment on EC2..."
+
             # Navigate to project directory
             cd ~/Giftyzet-celebration || exit 1
 
-            # Sync app source with GitHub (otherwise build uses stale files)
-            git fetch origin
+            # Ensure the repo is clean and on the correct branch
+            git reset --hard
+            git clean -fd
+            git fetch --all
             git checkout main
-            git reset --hard origin/main
+            git pull origin main
 
-            # Backup old .env.production (optional but safe)
+            echo "✅ Pulled latest code from main"
+
+            # Backup old .env.production
             if [ -f .env.production ]; then
               cp .env.production .env.production.bak
+              echo "💾 Backed up old .env.production"
             fi
 
             # Write latest secrets to .env.production
+            echo "Writing environment variables..."
             echo "NEXT_PUBLIC_SUPABASE_URL=${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}" > .env.production
             echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}" >> .env.production
             echo "NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=${{ secrets.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY }}" >> .env.production
@@ -48,24 +55,23 @@ jobs:
             echo "TWILIO_AUTH_TOKEN=${{ secrets.TWILIO_AUTH_TOKEN }}" >> .env.production
             echo "TWILIO_PHONE_NUMBER=${{ secrets.TWILIO_PHONE_NUMBER }}" >> .env.production
 
-            # Install dependencies
+            echo "✅ Environment variables updated"
+
+            # Install dependencies (only if package.json changed)
+            echo "Installing dependencies..."
             npm install
 
-            # Build the Next.js app in production mode
+            # Build the Next.js app
+            echo "Building Next.js app..."
             npm run build
 
-            # Restart the app using PM2
-            pm2 restart your_app_name || pm2 start npm --name "your_app_name" -- start
+            # Restart or start PM2
+            echo "Restarting PM2..."
+            pm2 describe your_app_name >/dev/null 2>&1
+            if [ $? -eq 0 ]; then
+              pm2 restart your_app_name
+            else
+              pm2 start npm --name "your_app_name" -- start
+            fi
 
-        # Pass secrets into the SSH environment (optional, already written to .env)
-        env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-          NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY }}
-          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
-          NEXT_PUBLIC_SITE_URL: ${{ secrets.NEXT_PUBLIC_SITE_URL }}
-          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
-          RESEND_FROM_EMAIL: ${{ secrets.RESEND_FROM_EMAIL }}
-          TWILIO_ACCOUNT_SID: ${{ secrets.TWILIO_ACCOUNT_SID }}
-          TWILIO_AUTH_TOKEN: ${{ secrets.TWILIO_AUTH_TOKEN }}
-          TWILIO_PHONE_NUMBER: ${{ secrets.TWILIO_PHONE_NUMBER }}
+            echo "✅ Deployment complete!"

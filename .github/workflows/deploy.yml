@@ -22,8 +22,14 @@ jobs:
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
+            set -e
             # Navigate to project directory
             cd ~/Giftyzet-celebration || exit 1
+
+            # Sync app source with GitHub (otherwise build uses stale files)
+            git fetch origin
+            git checkout main
+            git reset --hard origin/main
 
             # Backup old .env.production (optional but safe)
             if [ -f .env.production ]; then

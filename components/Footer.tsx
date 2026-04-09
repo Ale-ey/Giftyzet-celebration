@@ -65,9 +65,9 @@ export default function Footer() {
             </div>
           </div>
 
-          {/* Contact & FAQ */}
+          {/* Contact */}
           <div className="space-y-4">
-            <h4 className="text-lg font-semibold text-gray-900">Contact & FAQ</h4>
+            <h4 className="text-lg font-semibold text-gray-900">Contact</h4>
             <div className="space-y-3">
               <div className="flex items-start space-x-3">
                 <Mail className="h-5 w-5 text-primary mt-0.5" />
@@ -87,14 +87,6 @@ export default function Footer() {
                   <div className="text-sm font-medium text-gray-900">Location</div>
                   <div className="text-sm text-gray-600">Houston, TX</div>
                 </div>
-              </div>
-              <div>
-                <Link
-                  href="/faq"
-                  className="text-sm text-gray-600 hover:text-primary transition-colors"
-                >
-                  FAQ
-                </Link>
               </div>
             </div>
           </div>
